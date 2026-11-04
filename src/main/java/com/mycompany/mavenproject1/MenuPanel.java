@@ -19,7 +19,7 @@ public class MenuPanel extends JPanel {
     JTextArea txtDesk = new JTextArea(3, 15);
     JComboBox<String> cmbStatus = new JComboBox<>(new String[]{"tersedia", "habis"});
     JComboBox<Kat> cmbKat = new JComboBox<>();
-    int idTerpilih = 0; // 0 = belum ada yang dipilih (mode tambah baru)
+    int idTerpilih = 0;
 
     public MenuPanel() {
         setLayout(new BorderLayout(0, 16));
