@@ -1,0 +1,12 @@
+{
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-26",
+            "path": "C:\\Program Files\\Apache NetBeans\\jdk",
+            "default": true
+        }
+    ],
+    "java.jdt.ls.java.home": "C:\\Program Files\\Apache NetBeans\\jdk",
+    "jdk.jdkhome": "C:\\Program Files\\Apache NetBeans\\jdk"
+}
