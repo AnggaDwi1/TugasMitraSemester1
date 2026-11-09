@@ -73,8 +73,10 @@ public class TransaksiPanel extends JPanel {
         JTabbedPane tab = new JTabbedPane();
         tab.setFont(new Font("SansSerif", Font.BOLD, 13));
         tab.addTab("Kasir", buatTabKasir());
-        tab.addTab("Riwayat", buatTabRiwayat());
-        tab.addChangeListener(e -> { if (tab.getSelectedIndex() == 1) muatRiwayat(); });
+        if ("OWNER".equalsIgnoreCase(Sesi.roleKasir)) {
+            tab.addTab("Riwayat", buatTabRiwayat());
+            tab.addChangeListener(e -> { if (tab.getSelectedIndex() == 1) muatRiwayat(); });
+        }
         add(tab, BorderLayout.CENTER);
 
         segarkan();
@@ -246,7 +248,7 @@ public class TransaksiPanel extends JPanel {
     public void segarkan() {
         muatKategori();
         muatMenu();
-        muatRiwayat();
+        if ("OWNER".equalsIgnoreCase(Sesi.roleKasir)) muatRiwayat();
     }
 
     // ---------- kategori (chip) ----------

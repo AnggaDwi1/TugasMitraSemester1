@@ -6,11 +6,13 @@ import java.sql.SQLException;
 
 public class Koneksi {
 
-    private static final String DB   = "mitrasemester1"; // lihat di panel kiri phpMyAdmin
-    private static final String URL  = "jdbc:mysql://localhost:3306/" + DB
+    private static final String DB   = System.getProperty("kasir.db", "db_mitrasemester1");
+    private static final String HOST = System.getProperty("kasir.db.host", "localhost");
+    private static final String PORT = System.getProperty("kasir.db.port", "3306");
+    private static final String URL  = "jdbc:mysql://" + HOST + ":" + PORT + "/" + DB
             + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Jakarta";
-    private static final String USER = "root";
-    private static final String PASS = ""; // XAMPP default kosong
+    private static final String USER = System.getProperty("kasir.db.user", "root");
+    private static final String PASS = System.getProperty("kasir.db.password", "");
 
     public static Connection get() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASS);

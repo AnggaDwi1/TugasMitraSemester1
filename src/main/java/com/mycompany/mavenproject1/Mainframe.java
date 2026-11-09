@@ -44,7 +44,7 @@ public class Mainframe extends JFrame {
 
         pasangListenerRFID();
 
-        buka("dashboard", 0);
+        buka("OWNER".equalsIgnoreCase(Sesi.roleKasir) ? "dashboard" : "transaksi", 0);
     }
     
 void pasangListenerRFID() {
@@ -127,6 +127,7 @@ void logoutOtomatis() {
         
         Sesi.idKasir = 0;
         Sesi.namaKasir = "";
+        Sesi.roleKasir = "KARYAWAN";
         Sesi.idLog = 0;
         
         // KUNCI PENTING: Reset timer tepat saat logout selesai diproses
@@ -164,9 +165,10 @@ void logoutOtomatis() {
         String[] nama = {"Dashboard", "Menu", "Transaksi", "Setting"};
         String[] kunci = {"dashboard", "menu", "transaksi", "setting"};
         for (int i = 0; i < nama.length; i++) {
+            if (!"OWNER".equalsIgnoreCase(Sesi.roleKasir) && !"transaksi".equals(kunci[i])) continue;
             final int idx = i;
             Tema.NavTombol b = new Tema.NavTombol(nama[i]);
-            b.addActionListener(e -> buka(kunci[idx], idx));
+            b.addActionListener(e -> buka(kunci[idx], navTombol.indexOf(b)));
             navTombol.add(b);
             nav.add(b);
         }
@@ -184,7 +186,8 @@ void logoutOtomatis() {
         profil.setLayout(new BorderLayout(10, 0));
         profil.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         JLabel info = new JLabel("<html><b>" + Tema.esc(Sesi.namaKasir) + "</b><br>"
-                + "<span style='color:#1B9E6B;font-size:10px'>&#9679; Kasir Aktif</span></html>");
+                + "<span style='color:#1B9E6B;font-size:10px'>&#9679; "
+                + ("OWNER".equalsIgnoreCase(Sesi.roleKasir) ? "Owner" : "Karyawan") + "</span></html>");
         profil.add(Tema.avatar(inisial(Sesi.namaKasir), 38), BorderLayout.WEST);
         profil.add(info, BorderLayout.CENTER);
 
@@ -224,6 +227,7 @@ void logoutOtomatis() {
     }
 
     void buka(String nama, int aktif) {
+        if (!"OWNER".equalsIgnoreCase(Sesi.roleKasir) && !"transaksi".equals(nama)) return;
         switch (nama) {
             case "dashboard": dashboard.segarkan(); break;
             case "menu": menu.segarkan(); break;
