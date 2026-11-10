@@ -4,6 +4,10 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -25,10 +29,17 @@ public class TransaksiPanel extends JPanel {
     /** Kotak "foto" menu: kotak kuning muda dengan huruf depan nama menu. */
     static class Foto extends JPanel {
         final String huruf;
-        Foto(String nama) {
+        final Image gambar;
+        Foto(String nama, byte[] bytes) {
             setOpaque(false);
             setPreferredSize(new Dimension(0, 84));
             huruf = nama.isEmpty() ? "?" : nama.substring(0, 1).toUpperCase();
+            Image loaded = null;
+            if (bytes != null) try {
+                BufferedImage original = ImageIO.read(new ByteArrayInputStream(bytes));
+                if (original != null) loaded = original.getScaledInstance(240, 120, Image.SCALE_SMOOTH);
+            } catch (IOException ignored) { }
+            gambar = loaded;
         }
         @Override
         protected void paintComponent(Graphics g) {
@@ -37,11 +48,18 @@ public class TransaksiPanel extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g2.setColor(Tema.KUNING_MUDA);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
-            g2.setColor(Tema.COKELAT);
-            g2.setFont(new Font("SansSerif", Font.BOLD, 38));
-            FontMetrics fm = g2.getFontMetrics();
-            g2.drawString(huruf, (getWidth() - fm.stringWidth(huruf)) / 2,
-                    (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+            if (gambar != null) {
+                Shape oldClip = g2.getClip();
+                g2.clip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 14, 14));
+                g2.drawImage(gambar, 0, 0, getWidth(), getHeight(), this);
+                g2.setClip(oldClip);
+            } else {
+                g2.setColor(Tema.COKELAT);
+                g2.setFont(new Font("SansSerif", Font.BOLD, 38));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(huruf, (getWidth() - fm.stringWidth(huruf)) / 2,
+                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+            }
             g2.dispose();
         }
     }
@@ -286,7 +304,7 @@ public class TransaksiPanel extends JPanel {
     // ---------- kartu menu ----------
     void muatMenu() {
         gridMenu.removeAll();
-        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga FROM menu WHERE status='tersedia'");
+        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar FROM menu WHERE status='tersedia'");
         if (idKategoriAktif > 0) sql.append(" AND id_kategori=?");
         String cari = txtCari.getText().trim().toLowerCase();
         if (!cari.isEmpty()) sql.append(" AND LOWER(nama_menu) LIKE ?");
@@ -297,7 +315,7 @@ public class TransaksiPanel extends JPanel {
             if (idKategoriAktif > 0) ps.setInt(i++, idKategoriAktif);
             if (!cari.isEmpty()) ps.setString(i++, "%" + cari + "%");
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) gridMenu.add(kartuMenu(rs.getInt(1), rs.getString(2), rs.getDouble(3)));
+                while (rs.next()) gridMenu.add(kartuMenu(rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getBytes(4)));
             }
         } catch (SQLException e) {
             Db.error(e);
@@ -311,7 +329,7 @@ public class TransaksiPanel extends JPanel {
         gridMenu.repaint();
     }
 
-    Tema.Kartu kartuMenu(int id, String nama, double harga) {
+    Tema.Kartu kartuMenu(int id, String nama, double harga, byte[] gambar) {
         Tema.Kartu k = new Tema.Kartu();
         k.setLayout(new BorderLayout(0, 8));
         k.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -329,7 +347,7 @@ public class TransaksiPanel extends JPanel {
         JButton b = Tema.tombol("+ Tambah", Tema.KUNING);
         b.addActionListener(e -> dialogTambah(id, nama, harga));
 
-        k.add(new Foto(nama), BorderLayout.NORTH);
+        k.add(new Foto(nama, gambar), BorderLayout.NORTH);
         k.add(info, BorderLayout.CENTER);
         k.add(b, BorderLayout.SOUTH);
         k.addMouseListener(new java.awt.event.MouseAdapter() {

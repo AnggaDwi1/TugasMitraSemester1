@@ -3,6 +3,10 @@ package com.mycompany.mavenproject1;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 import java.sql.*;
 
 public class MenuPanel extends JPanel {
@@ -19,6 +23,8 @@ public class MenuPanel extends JPanel {
     JTextArea txtDesk = new JTextArea(3, 15);
     JComboBox<String> cmbStatus = new JComboBox<>(new String[]{"tersedia", "habis"});
     JComboBox<Kat> cmbKat = new JComboBox<>();
+    JLabel lblGambar = new JLabel("Belum ada gambar", SwingConstants.CENTER);
+    byte[] gambarTerpilih;
     int idTerpilih = 0;
 
     public MenuPanel() {
@@ -43,13 +49,43 @@ public class MenuPanel extends JPanel {
         txtDesk.setLineWrap(true);
         txtDesk.setWrapStyleWord(true);
 
-        JPanel form = new JPanel(new GridLayout(0, 1, 0, 4));
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setOpaque(false);
-        form.add(new JLabel("Nama menu"));  form.add(txtNama);
-        form.add(new JLabel("Harga"));      form.add(txtHarga);
-        form.add(new JLabel("Kategori"));   form.add(cmbKat);
-        form.add(new JLabel("Status"));     form.add(cmbStatus);
-        form.add(new JLabel("Deskripsi"));
+        form.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lblGambar.setPreferredSize(new Dimension(300, 130));
+        lblGambar.setMinimumSize(new Dimension(0, 130));
+        lblGambar.setMaximumSize(new Dimension(300, 130));
+        lblGambar.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
+        JButton btnPilihGambar = new JButton("Pilih Gambar...");
+        JButton btnHapusGambar = new JButton("Hapus Gambar");
+        btnPilihGambar.setPreferredSize(new Dimension(0, 34));
+        btnHapusGambar.setPreferredSize(new Dimension(0, 34));
+        gayaTombolRingan(btnPilihGambar);
+        gayaTombolRingan(btnHapusGambar);
+        btnPilihGambar.addActionListener(e -> pilihGambar());
+        btnHapusGambar.addActionListener(e -> setGambar(null));
+        JPanel aksiGambar = new JPanel(new GridLayout(1, 2, 6, 0));
+        aksiGambar.setOpaque(false);
+        aksiGambar.add(btnPilihGambar);
+        aksiGambar.add(btnHapusGambar);
+        aksiGambar.setPreferredSize(new Dimension(300, 36));
+        aksiGambar.setMaximumSize(new Dimension(300, 36));
+        aksiGambar.setAlignmentX(Component.CENTER_ALIGNMENT);
+        tambahKolom(form, "Gambar menu", lblGambar);
+        form.add(aksiGambar);
+        tambahKolom(form, "Nama menu", txtNama);
+        tambahKolom(form, "Harga", txtHarga);
+        tambahKolom(form, "Kategori", cmbKat);
+        tambahKolom(form, "Status", cmbStatus);
+        txtDesk.setPreferredSize(new Dimension(100, 84));
+        txtDesk.setMaximumSize(new Dimension(Integer.MAX_VALUE, 84));
+        JScrollPane scrollDesk = new JScrollPane(txtDesk);
+        scrollDesk.setPreferredSize(new Dimension(300, 84));
+        scrollDesk.setMaximumSize(new Dimension(300, 84));
+        scrollDesk.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
+        scrollDesk.getViewport().setBackground(Color.WHITE);
+        tambahKolom(form, "Deskripsi", scrollDesk);
 
         JButton btnSimpan = Tema.tombol("Simpan", Tema.BIRU);
         JButton btnHapus = Tema.tombol("Hapus", Tema.MERAH);
@@ -66,16 +102,41 @@ public class MenuPanel extends JPanel {
 
         Tema.Kartu kartuForm = new Tema.Kartu();
         kartuForm.setLayout(new BorderLayout(0, 6));
-        kartuForm.setPreferredSize(new Dimension(300, 0));
-        JPanel atasForm = new JPanel(new BorderLayout());
-        atasForm.setOpaque(false);
-        atasForm.add(form, BorderLayout.NORTH);
-        atasForm.add(new JScrollPane(txtDesk), BorderLayout.CENTER);
-        kartuForm.add(atasForm, BorderLayout.CENTER);
+        kartuForm.setPreferredSize(new Dimension(330, 0));
+        JScrollPane scrollForm = new JScrollPane(form);
+        scrollForm.setBorder(null);
+        scrollForm.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollForm.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollForm.setOpaque(false);
+        scrollForm.getViewport().setOpaque(false);
+        scrollForm.getVerticalScrollBar().setUnitIncrement(18);
+        kartuForm.add(scrollForm, BorderLayout.CENTER);
         kartuForm.add(tombol, BorderLayout.SOUTH);
         add(kartuForm, BorderLayout.EAST);
 
         segarkan();
+    }
+
+    private void tambahKolom(JPanel panel, String judul, JComponent isi) {
+        JLabel label = new JLabel(judul);
+        label.setHorizontalAlignment("Gambar menu".equals(judul)
+                ? SwingConstants.CENTER : SwingConstants.LEFT);
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        isi.setAlignmentX(Component.CENTER_ALIGNMENT);
+        int tinggi = isi == lblGambar ? 130 : isi instanceof JScrollPane ? 84 : 36;
+        isi.setPreferredSize(new Dimension(300, tinggi));
+        isi.setMaximumSize(new Dimension(300, tinggi));
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(label);
+        panel.add(Box.createVerticalStrut(5));
+        panel.add(isi);
+    }
+
+    private void gayaTombolRingan(JButton tombol) {
+        tombol.setFocusPainted(false);
+        tombol.setBackground(Tema.BG);
+        tombol.setForeground(Tema.COKELAT);
+        tombol.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
     }
 
     public void segarkan() {
@@ -106,6 +167,7 @@ public class MenuPanel extends JPanel {
         txtHarga.setText(m.getValueAt(row, 3).toString());
         cmbStatus.setSelectedItem(m.getValueAt(row, 4).toString());
         txtDesk.setText(m.getValueAt(row, 5).toString());
+        muatGambar(idTerpilih);
         String namaKat = m.getValueAt(row, 2).toString();
         for (int i = 0; i < cmbKat.getItemCount(); i++) {
             if (cmbKat.getItemAt(i).nama.equals(namaKat)) { cmbKat.setSelectedIndex(i); break; }
@@ -118,6 +180,7 @@ public class MenuPanel extends JPanel {
         txtNama.setText("");
         txtHarga.setText("");
         txtDesk.setText("");
+        setGambar(null);
         cmbStatus.setSelectedIndex(0);
         if (cmbKat.getItemCount() > 0) cmbKat.setSelectedIndex(0);
     }
@@ -145,13 +208,14 @@ public class MenuPanel extends JPanel {
                 if (idTerpilih == 0) {
                     int idBaru;
                     try (PreparedStatement ps = c.prepareStatement(
-                            "INSERT INTO menu (id_kategori, nama_menu, harga, deskripsi, status) VALUES (?,?,?,?,?)",
+                            "INSERT INTO menu (id_kategori, nama_menu, harga, deskripsi, status, gambar) VALUES (?,?,?,?,?,?)",
                             Statement.RETURN_GENERATED_KEYS)) {
                         if (kat == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, kat.id);
                         ps.setString(2, nama);
                         ps.setDouble(3, harga);
                         ps.setString(4, desk.isEmpty() ? null : desk);
                         ps.setString(5, (String) cmbStatus.getSelectedItem());
+                        setBlob(ps, 6, gambarTerpilih);
                         ps.executeUpdate();
                         try (ResultSet k = ps.getGeneratedKeys()) { k.next(); idBaru = k.getInt(1); }
                     }
@@ -163,13 +227,14 @@ public class MenuPanel extends JPanel {
                     }
                 } else {
                     try (PreparedStatement ps = c.prepareStatement(
-                            "UPDATE menu SET id_kategori=?, nama_menu=?, harga=?, deskripsi=?, status=? WHERE id_menu=?")) {
+                            "UPDATE menu SET id_kategori=?, nama_menu=?, harga=?, deskripsi=?, status=?, gambar=? WHERE id_menu=?")) {
                         if (kat == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, kat.id);
                         ps.setString(2, nama);
                         ps.setDouble(3, harga);
                         ps.setString(4, desk.isEmpty() ? null : desk);
                         ps.setString(5, (String) cmbStatus.getSelectedItem());
-                        ps.setInt(6, idTerpilih);
+                        setBlob(ps, 6, gambarTerpilih);
+                        ps.setInt(7, idTerpilih);
                         ps.executeUpdate();
                     }
                 }
@@ -182,6 +247,59 @@ public class MenuPanel extends JPanel {
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Gagal menyimpan: " + e.getMessage());
         }
+    }
+
+    private void pilihGambar() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Pilih gambar menu");
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Gambar (JPG, PNG, GIF, WebP)", "jpg", "jpeg", "png", "gif", "webp"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        try {
+            BufferedImage image = ImageIO.read(chooser.getSelectedFile());
+            if (image == null) throw new IOException("File bukan gambar yang didukung.");
+            setGambar(GambarMenu.keWebp(image));
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal membaca gambar: " + ex.getMessage());
+        }
+    }
+
+    private void muatGambar(int id) {
+        try (Connection c = Koneksi.get(); PreparedStatement ps = c.prepareStatement("SELECT gambar FROM menu WHERE id_menu=?")) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) { setGambar(null); return; }
+                byte[] bytes = rs.getBytes(1);
+                if (bytes == null) { setGambar(null); return; }
+                BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+                setGambar(image == null ? bytes : GambarMenu.keWebp(image));
+            }
+        } catch (SQLException | IOException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal memuat gambar: " + ex.getMessage());
+        }
+    }
+
+    private void setGambar(byte[] bytes) {
+        gambarTerpilih = bytes;
+        if (bytes == null || bytes.length == 0) {
+            lblGambar.setIcon(null);
+            lblGambar.setText("Belum ada gambar");
+            return;
+        }
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+            if (image == null) throw new IOException("Data gambar tidak valid.");
+            Image scaled = image.getScaledInstance(240, 130, Image.SCALE_SMOOTH);
+            lblGambar.setText("");
+            lblGambar.setIcon(new ImageIcon(scaled));
+        } catch (IOException ex) {
+            lblGambar.setIcon(null);
+            lblGambar.setText("Gambar tidak valid");
+        }
+    }
+
+    private static void setBlob(PreparedStatement ps, int index, byte[] bytes) throws SQLException {
+        if (bytes == null) ps.setNull(index, Types.BLOB); else ps.setBytes(index, bytes);
     }
 
     void hapus() {

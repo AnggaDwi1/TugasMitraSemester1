@@ -6,7 +6,7 @@ import java.sql.SQLException;
 
 public class Koneksi {
 
-    private static final String DB   = System.getProperty("kasir.db", "db_mitrasemester1");
+    private static final String DB   = System.getProperty("kasir.db", "mitrasemester1");
     private static final String HOST = System.getProperty("kasir.db.host", "localhost");
     private static final String PORT = System.getProperty("kasir.db.port", "3306");
     private static final String URL  = "jdbc:mysql://" + HOST + ":" + PORT + "/" + DB

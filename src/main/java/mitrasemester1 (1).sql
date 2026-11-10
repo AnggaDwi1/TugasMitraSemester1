@@ -113,7 +113,8 @@ CREATE TABLE `menu` (
   `nama_menu` varchar(100) NOT NULL,
   `harga` decimal(10,2) NOT NULL,
   `deskripsi` text,
-  `status` enum('tersedia','habis') DEFAULT 'tersedia'
+  `status` enum('tersedia','habis') DEFAULT 'tersedia',
+  `gambar` mediumblob DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
