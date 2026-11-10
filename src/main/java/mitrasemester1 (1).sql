@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `mitrasemester1`
+-- Database: `db_mitrasemester1`
 --
 
 -- --------------------------------------------------------
@@ -30,16 +30,20 @@ SET time_zone = "+00:00";
 CREATE TABLE `kasir` (
   `id_kasir` int NOT NULL,
   `nama_kasir` varchar(50) NOT NULL,
-  `uid_kartu` varchar(30) NOT NULL,
-  `status` enum('aktif','nonaktif') DEFAULT 'aktif'
+  `uid_kartu` varchar(30) DEFAULT NULL,
+  `status` enum('aktif','nonaktif') DEFAULT 'aktif',
+  `role` enum('OWNER','KARYAWAN') NOT NULL DEFAULT 'KARYAWAN',
+  `pin_hash` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `kasir`
 --
 
-INSERT INTO `kasir` (`id_kasir`, `nama_kasir`, `uid_kartu`, `status`) VALUES
-(1, 'Pak Owo', '123', 'aktif');
+-- Hash PIN sengaja tidak dimasukkan ke dump. Set PIN masing-masing setelah impor.
+INSERT INTO `kasir` (`id_kasir`, `nama_kasir`, `uid_kartu`, `status`, `role`, `pin_hash`) VALUES
+(1, 'Pak Owo', '123', 'aktif', 'KARYAWAN', NULL),
+(2, 'Yuyut', NULL, 'aktif', 'OWNER', NULL);
 
 -- --------------------------------------------------------
 
@@ -421,7 +425,7 @@ ALTER TABLE `varian_rasa`
 -- AUTO_INCREMENT for table `kasir`
 --
 ALTER TABLE `kasir`
-  MODIFY `id_kasir` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_kasir` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `kategori_menu`
