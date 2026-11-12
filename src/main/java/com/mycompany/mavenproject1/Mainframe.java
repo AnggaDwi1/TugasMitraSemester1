@@ -20,6 +20,7 @@ public class Mainframe extends JFrame {
     TransaksiPanel transaksi = new TransaksiPanel();
     MenuPanel menu = new MenuPanel();
     SettingPanel setting = new SettingPanel();
+    LaporanPanel laporan = new LaporanPanel();
 
     List<Tema.NavTombol> navTombol = new ArrayList<>();
 
@@ -38,6 +39,7 @@ public class Mainframe extends JFrame {
         isi.add(menu, "menu");
         isi.add(transaksi, "transaksi");
         isi.add(setting, "setting");
+        isi.add(laporan, "laporan");
 
         add(buatSidebar(), BorderLayout.WEST);
         add(isi, BorderLayout.CENTER);
@@ -162,8 +164,8 @@ void logoutOtomatis() {
         // ----- menu navigasi -----
         JPanel nav = new JPanel(new GridLayout(0, 1, 0, 6));
         nav.setOpaque(false);
-        String[] nama = {"Dashboard", "Menu", "Transaksi", "Setting"};
-        String[] kunci = {"dashboard", "menu", "transaksi", "setting"};
+        String[] nama = {"Dashboard", "Menu", "Transaksi", "Laporan", "Setting"};
+        String[] kunci = {"dashboard", "menu", "transaksi", "laporan", "setting"};
         for (int i = 0; i < nama.length; i++) {
             if (!"OWNER".equalsIgnoreCase(Sesi.roleKasir) && !"transaksi".equals(kunci[i])) continue;
             final int idx = i;
@@ -233,6 +235,7 @@ void logoutOtomatis() {
             case "menu": menu.segarkan(); break;
             case "transaksi": transaksi.segarkan(); break;
             case "setting": setting.segarkan(); break;
+            case "laporan": laporan.segarkan(); break;
         }
         kartu.show(isi, nama);
         for (int i = 0; i < navTombol.size(); i++) {
