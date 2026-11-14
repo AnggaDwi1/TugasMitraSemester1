@@ -7,13 +7,13 @@ import javax.swing.UIManager;
 public class Mavenproject1 {
 
     public static void main(String[] args) {
-        // 1. Pasang tema desain UI
+     
         FlatLightLaf.setup();
         UIManager.put("Button.arc", 14);
         UIManager.put("Component.arc", 14);
         UIManager.put("TextComponent.arc", 14);
 
-        // 2. Warna & gaya Yellow & Cream
+        
         UIManager.put("Label.foreground", Tema.COKELAT);
         UIManager.put("CheckBox.foreground", Tema.COKELAT);
         UIManager.put("TextField.foreground", Tema.COKELAT);

@@ -1,17 +1,55 @@
 package com.mycompany.mavenproject1;
 
-import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import javax.imageio.ImageIO;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.ListSelectionModel;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 public class TransaksiPanel extends JPanel {
 
@@ -304,7 +342,7 @@ public class TransaksiPanel extends JPanel {
     // ---------- kartu menu ----------
     void muatMenu() {
         gridMenu.removeAll();
-        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar FROM menu WHERE status='tersedia'");
+        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar, stok FROM menu WHERE status='tersedia'");
         if (idKategoriAktif > 0) sql.append(" AND id_kategori=?");
         String cari = txtCari.getText().trim().toLowerCase();
         if (!cari.isEmpty()) sql.append(" AND LOWER(nama_menu) LIKE ?");
@@ -315,7 +353,7 @@ public class TransaksiPanel extends JPanel {
             if (idKategoriAktif > 0) ps.setInt(i++, idKategoriAktif);
             if (!cari.isEmpty()) ps.setString(i++, "%" + cari + "%");
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) gridMenu.add(kartuMenu(rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getBytes(4)));
+                while (rs.next()) gridMenu.add(kartuMenu(rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getBytes(4), rs.getInt(5)));
             }
         } catch (SQLException e) {
             Db.error(e);
@@ -329,7 +367,7 @@ public class TransaksiPanel extends JPanel {
         gridMenu.repaint();
     }
 
-    Tema.Kartu kartuMenu(int id, String nama, double harga, byte[] gambar) {
+    Tema.Kartu kartuMenu(int id, String nama, double harga, byte[] gambar, int stok) {
         Tema.Kartu k = new Tema.Kartu();
         k.setLayout(new BorderLayout(0, 8));
         k.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -339,25 +377,49 @@ public class TransaksiPanel extends JPanel {
         JLabel h = new JLabel(Tema.rp(harga));
         h.setFont(new Font("SansSerif", Font.BOLD, 15));
         h.setForeground(Tema.COKELAT);
+
+        // Label stok
+        JLabel lblStok = new JLabel("Stok: " + stok);
+        lblStok.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        lblStok.setForeground(stok <= 10 ? Tema.MERAH : stok <= 30 ? Tema.ORANYE : Tema.ABU);
+
         JPanel info = new JPanel(new BorderLayout(0, 2));
         info.setOpaque(false);
         info.add(n, BorderLayout.NORTH);
         info.add(h, BorderLayout.CENTER);
+        info.add(lblStok, BorderLayout.SOUTH);
 
-        JButton b = Tema.tombol("+ Tambah", Tema.KUNING);
-        b.addActionListener(e -> dialogTambah(id, nama, harga));
+        JButton b;
+        if (stok <= 0) {
+            b = Tema.tombol("Habis", Tema.MERAH);
+            b.setEnabled(false);
+        } else {
+            b = Tema.tombol("+ Tambah", Tema.KUNING);
+            b.addActionListener(e -> dialogTambah(id, nama, harga, stok));
+        }
 
         k.add(new Foto(nama, gambar), BorderLayout.NORTH);
         k.add(info, BorderLayout.CENTER);
         k.add(b, BorderLayout.SOUTH);
         k.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent e) { dialogTambah(id, nama, harga); }
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) { if (stok > 0) dialogTambah(id, nama, harga, stok); }
         });
         return k;
     }
 
     /** Dialog kecil untuk pilih rasa, jumlah, dan catatan. */
-    void dialogTambah(int idMenu, String nama, double harga) {
+    void dialogTambah(int idMenu, String nama, double harga, int stok) {
+        // Hitung berapa qty menu ini yang sudah ada di keranjang
+        int sudahDiKeranjang = 0;
+        for (Item it : keranjang) {
+            if (it.idMenu == idMenu) sudahDiKeranjang += it.qty;
+        }
+        int sisaStok = stok - sudahDiKeranjang;
+        if (sisaStok <= 0) {
+            JOptionPane.showMessageDialog(this, "Stok " + nama + " sudah habis di keranjang.");
+            return;
+        }
+
         JComboBox<Rasa> cmbRasa = new JComboBox<>();
         cmbRasa.addItem(new Rasa(0, "Tanpa rasa"));
         try (Connection c = Koneksi.get();
@@ -374,7 +436,7 @@ public class TransaksiPanel extends JPanel {
         }
         if (cmbRasa.getItemCount() > 1) cmbRasa.setSelectedIndex(1);
 
-        JSpinner spn = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        JSpinner spn = new JSpinner(new SpinnerNumberModel(1, 1, sisaStok, 1));
         JTextField txtCatatan = new JTextField(15);
         JPanel form = new JPanel(new GridLayout(0, 2, 6, 6));
         form.add(new JLabel("Rasa:"));    form.add(cmbRasa);
@@ -586,6 +648,17 @@ public class TransaksiPanel extends JPanel {
                     ps.executeBatch();
                 }
 
+                // 3b. kurangi stok menu
+                try (PreparedStatement ps = c.prepareStatement(
+                        "UPDATE menu SET stok = stok - ? WHERE id_menu = ?")) {
+                    for (Item it : keranjang) {
+                        ps.setInt(1, it.qty);
+                        ps.setInt(2, it.idMenu);
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+
                 // 4. pembayaran
                 try (PreparedStatement ps = c.prepareStatement(
                         "INSERT INTO pembayaran (id_transaksi, metode, jumlah_bayar, kembalian) VALUES (?,?,?,?)")) {
@@ -606,6 +679,7 @@ public class TransaksiPanel extends JPanel {
         }
 
         reset();
+        muatMenu();
         muatRiwayat();
         // struk dicetak SETELAH data tersimpan
         if ("1".equals(Pengaturan.get("otomatis", "0"))) Struk.cetakLangsung(this, idTrx);
@@ -672,13 +746,32 @@ public class TransaksiPanel extends JPanel {
                 "Batalkan transaksi ini? Transaksi batal tidak dihitung di omzet.",
                 "Konfirmasi", JOptionPane.YES_NO_OPTION);
         if (ok != JOptionPane.YES_OPTION) return;
-        try (Connection c = Koneksi.get();
-             PreparedStatement ps = c.prepareStatement("UPDATE transaksi SET status='batal' WHERE id_transaksi=?")) {
-            ps.setInt(1, id);
-            ps.executeUpdate();
+        try (Connection c = Koneksi.get()) {
+            c.setAutoCommit(false);
+            try {
+                int berubah;
+                try (PreparedStatement ps = c.prepareStatement(
+                        "UPDATE transaksi SET status='batal' WHERE id_transaksi=? AND status='selesai'")) {
+                    ps.setInt(1, id);
+                    berubah = ps.executeUpdate();
+                }
+                if (berubah > 0) { // kembalikan stok hanya jika transaksi baru saja dibatalkan
+                    try (PreparedStatement ps = c.prepareStatement(
+                            "UPDATE menu m JOIN transaksi_detail d ON d.id_menu=m.id_menu "
+                          + "SET m.stok = m.stok + d.jumlah WHERE d.id_transaksi=?")) {
+                        ps.setInt(1, id);
+                        ps.executeUpdate();
+                    }
+                }
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
         } catch (SQLException e) {
             Db.error(e);
         }
         muatRiwayat();
+        muatMenu();
     }
 }

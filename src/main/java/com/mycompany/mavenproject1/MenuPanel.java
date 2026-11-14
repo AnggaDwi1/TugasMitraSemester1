@@ -1,13 +1,41 @@
 package com.mycompany.mavenproject1;
 
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridLayout;
+import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+
 import javax.imageio.ImageIO;
-import java.sql.*;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingConstants;
+import javax.swing.table.DefaultTableModel;
 
 public class MenuPanel extends JPanel {
 
@@ -20,6 +48,7 @@ public class MenuPanel extends JPanel {
     JTable tbl = new JTable();
     JTextField txtNama = new JTextField();
     JTextField txtHarga = new JTextField();
+    JTextField txtStok = new JTextField();
     JTextArea txtDesk = new JTextArea(3, 15);
     JComboBox<String> cmbStatus = new JComboBox<>(new String[]{"tersedia", "habis"});
     JComboBox<Kat> cmbKat = new JComboBox<>();
@@ -76,6 +105,7 @@ public class MenuPanel extends JPanel {
         form.add(aksiGambar);
         tambahKolom(form, "Nama menu", txtNama);
         tambahKolom(form, "Harga", txtHarga);
+        tambahKolom(form, "Stok", txtStok);
         tambahKolom(form, "Kategori", cmbKat);
         tambahKolom(form, "Status", cmbStatus);
         txtDesk.setPreferredSize(new Dimension(100, 84));
@@ -94,8 +124,12 @@ public class MenuPanel extends JPanel {
         btnHapus.addActionListener(e -> hapus());
         btnBaru.addActionListener(e -> kosongkan());
 
+        JButton btnTambahStok = Tema.tombol("+ Tambah Stok", Tema.HIJAU);
+        btnTambahStok.addActionListener(e -> tambahStok());
+
         JPanel tombol = new JPanel(new GridLayout(0, 1, 0, 6));
         tombol.setOpaque(false);
+        tombol.add(btnTambahStok);
         tombol.add(btnSimpan);
         tombol.add(btnHapus);
         tombol.add(btnBaru);
@@ -152,9 +186,9 @@ public class MenuPanel extends JPanel {
         // tabel
         tbl.setModel(Db.kueri(
                 "SELECT m.id_menu, m.nama_menu, COALESCE(k.nama_kategori,'-'), CAST(m.harga AS UNSIGNED), "
-              + "m.status, COALESCE(m.deskripsi,'') "
+              + "m.status, COALESCE(m.deskripsi,''), m.stok "
               + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori ORDER BY m.id_menu",
-                new String[]{"ID", "Menu", "Kategori", "Harga", "Status", "Deskripsi"}));
+                new String[]{"ID", "Menu", "Kategori", "Harga", "Status", "Deskripsi", "Stok"}));
         kosongkan();
     }
 
@@ -167,6 +201,7 @@ public class MenuPanel extends JPanel {
         txtHarga.setText(m.getValueAt(row, 3).toString());
         cmbStatus.setSelectedItem(m.getValueAt(row, 4).toString());
         txtDesk.setText(m.getValueAt(row, 5).toString());
+        txtStok.setText(m.getValueAt(row, 6).toString());
         muatGambar(idTerpilih);
         String namaKat = m.getValueAt(row, 2).toString();
         for (int i = 0; i < cmbKat.getItemCount(); i++) {
@@ -179,6 +214,7 @@ public class MenuPanel extends JPanel {
         tbl.clearSelection();
         txtNama.setText("");
         txtHarga.setText("");
+        txtStok.setText("0");
         txtDesk.setText("");
         setGambar(null);
         cmbStatus.setSelectedIndex(0);
@@ -199,6 +235,14 @@ public class MenuPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Harga harus berupa angka lebih dari 0");
             return;
         }
+        int stok;
+        try {
+            stok = Integer.parseInt(txtStok.getText().trim());
+            if (stok < 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Stok harus berupa angka bulat 0 atau lebih");
+            return;
+        }
         Kat kat = (Kat) cmbKat.getSelectedItem();
         String desk = txtDesk.getText().trim();
 
@@ -208,7 +252,7 @@ public class MenuPanel extends JPanel {
                 if (idTerpilih == 0) {
                     int idBaru;
                     try (PreparedStatement ps = c.prepareStatement(
-                            "INSERT INTO menu (id_kategori, nama_menu, harga, deskripsi, status, gambar) VALUES (?,?,?,?,?,?)",
+                            "INSERT INTO menu (id_kategori, nama_menu, harga, deskripsi, status, gambar, stok) VALUES (?,?,?,?,?,?,?)",
                             Statement.RETURN_GENERATED_KEYS)) {
                         if (kat == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, kat.id);
                         ps.setString(2, nama);
@@ -216,6 +260,7 @@ public class MenuPanel extends JPanel {
                         ps.setString(4, desk.isEmpty() ? null : desk);
                         ps.setString(5, (String) cmbStatus.getSelectedItem());
                         setBlob(ps, 6, gambarTerpilih);
+                        ps.setInt(7, stok);
                         ps.executeUpdate();
                         try (ResultSet k = ps.getGeneratedKeys()) { k.next(); idBaru = k.getInt(1); }
                     }
@@ -227,14 +272,15 @@ public class MenuPanel extends JPanel {
                     }
                 } else {
                     try (PreparedStatement ps = c.prepareStatement(
-                            "UPDATE menu SET id_kategori=?, nama_menu=?, harga=?, deskripsi=?, status=?, gambar=? WHERE id_menu=?")) {
+                            "UPDATE menu SET id_kategori=?, nama_menu=?, harga=?, deskripsi=?, status=?, gambar=?, stok=? WHERE id_menu=?")) {
                         if (kat == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, kat.id);
                         ps.setString(2, nama);
                         ps.setDouble(3, harga);
                         ps.setString(4, desk.isEmpty() ? null : desk);
                         ps.setString(5, (String) cmbStatus.getSelectedItem());
                         setBlob(ps, 6, gambarTerpilih);
-                        ps.setInt(7, idTerpilih);
+                        ps.setInt(7, stok);
+                        ps.setInt(8, idTerpilih);
                         ps.executeUpdate();
                     }
                 }
@@ -247,6 +293,35 @@ public class MenuPanel extends JPanel {
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Gagal menyimpan: " + e.getMessage());
         }
+    }
+
+    void tambahStok() {
+        if (idTerpilih == 0) {
+            JOptionPane.showMessageDialog(this, "Pilih menu di tabel dulu");
+            return;
+        }
+        String input = JOptionPane.showInputDialog(this,
+                "Tambah stok \"" + txtNama.getText() + "\" sebanyak:", "Tambah Stok", JOptionPane.PLAIN_MESSAGE);
+        if (input == null) return;
+        int tambah;
+        try {
+            tambah = Integer.parseInt(input.trim());
+            if (tambah <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Masukkan angka bulat lebih dari 0");
+            return;
+        }
+        try (Connection c = Koneksi.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE menu SET stok = stok + ?, status='tersedia' WHERE id_menu=?")) {
+            ps.setInt(1, tambah);
+            ps.setInt(2, idTerpilih);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            Db.error(e);
+            return;
+        }
+        segarkan();
     }
 
     private void pilihGambar() {
