@@ -39,10 +39,15 @@ public class LoginFrame extends JFrame {
         JPanel wrapper = new JPanel(new GridBagLayout());
         wrapper.setBackground(Color.WHITE);
 
-        JPanel form = new JPanel();
-        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-        form.setOpaque(false);
-        form.setPreferredSize(new Dimension(320, 420));
+JPanel form = new JPanel() {
+    @Override
+    public Dimension getPreferredSize() {
+        Dimension d = super.getPreferredSize();
+        return new Dimension(Math.max(d.width, 400), d.height);
+    }
+};
+form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+form.setOpaque(false);
 
         // Logo / Brand
         JLabel lblBrand = new JLabel("TAHU WALIK");
@@ -147,7 +152,7 @@ public class LoginFrame extends JFrame {
                 } else {
                     g2.setColor(Tema.KUNING);
                 }
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -263,8 +268,8 @@ public class LoginFrame extends JFrame {
         infoCard.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel lblQuote = new JLabel("<html><div style='text-align:center;color:white;'>"
-                + "Renyah di luar,<br>lembut di dalam.<br>"
-                + "<i>Tahu Walik khas Batu.</i></div></html>");
+                + "Renyah di luar,<br>lembut di dalam.<br>");
+               
         lblQuote.setFont(new Font("SansSerif", Font.PLAIN, 13));
         lblQuote.setForeground(Color.WHITE);
         lblQuote.setAlignmentX(Component.CENTER_ALIGNMENT);
