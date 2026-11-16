@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.awt.image.BufferedImage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -18,12 +19,16 @@ public class LoginFrame extends JFrame {
     private JPasswordField txtPin;
 
     public LoginFrame() {
-        setTitle("Login Kasir - Tahu Walik");
+        setTitle("Login Kasir - CHIKAS");
         setSize(900, 550);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(Color.WHITE);
         setLayout(new BorderLayout());
+
+        // ikon aplikasi (pakai logo)
+        BufferedImage ikon = muatLogo();
+        if (ikon != null) setIconImage(ikon);
 
         // ===== PANEL UTAMA: kiri (form) + kanan (banner) =====
         JPanel utama = new JPanel(new GridLayout(1, 2));
@@ -39,20 +44,20 @@ public class LoginFrame extends JFrame {
         JPanel wrapper = new JPanel(new GridBagLayout());
         wrapper.setBackground(Color.WHITE);
 
-JPanel form = new JPanel() {
-    @Override
-    public Dimension getPreferredSize() {
-        Dimension d = super.getPreferredSize();
-        return new Dimension(Math.max(d.width, 400), d.height);
-    }
-};
-form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-form.setOpaque(false);
+        JPanel form = new JPanel() {
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension d = super.getPreferredSize();
+                return new Dimension(Math.max(d.width, 400), d.height);
+            }
+        };
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
 
         // Logo / Brand
-        JLabel lblBrand = new JLabel("TAHU WALIK");
-        lblBrand.setFont(new Font("SansSerif", Font.BOLD, 20));
-        lblBrand.setForeground(Tema.KUNING);
+        JLabel lblBrand = new JLabel("CHIKAS");
+        lblBrand.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 22), 0.12f));
+        lblBrand.setForeground(Tema.COKELAT);
         lblBrand.setAlignmentX(Component.LEFT_ALIGNMENT);
         form.add(lblBrand);
 
@@ -85,19 +90,10 @@ form.setOpaque(false);
         form.add(Box.createVerticalStrut(16));
 
         // ── Separator ──
-        JPanel sep = new JPanel(new BorderLayout(10, 0));
-        sep.setOpaque(false);
-        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
-        sep.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JSeparator s1 = new JSeparator();
-        s1.setForeground(Tema.GARIS);
-        JSeparator s2 = new JSeparator();
-        s2.setForeground(Tema.GARIS);
         JLabel lblAtau = new JLabel("atau", SwingConstants.CENTER);
         lblAtau.setFont(new Font("SansSerif", Font.PLAIN, 11));
         lblAtau.setForeground(Tema.ABU);
-        sep.add(s1, BorderLayout.WEST);
-        // Use a trick: put separators in a box
+
         JPanel sepLine = new JPanel(new GridLayout(1, 3, 8, 0));
         sepLine.setOpaque(false);
         sepLine.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
@@ -169,10 +165,11 @@ form.setOpaque(false);
         btnMasuk.addActionListener(e -> prosesLoginPin(txtNama.getText().trim(), txtPin.getPassword()));
         form.add(btnMasuk);
 
+        form.add(Box.createVerticalStrut(14));
         form.add(Box.createVerticalGlue());
 
         // Footer
-        JLabel lblFooter = new JLabel("© 2025 Tahu Walik • Kasir Point of Sale");
+        JLabel lblFooter = new JLabel("© 2025 CHIKAS • Kasir Point of Sale");
         lblFooter.setFont(new Font("SansSerif", Font.PLAIN, 10));
         lblFooter.setForeground(new Color(0xC0B09A));
         lblFooter.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -224,21 +221,20 @@ form.setOpaque(false);
         konten.setLayout(new BoxLayout(konten, BoxLayout.Y_AXIS));
         konten.setOpaque(false);
 
-        // Ikon tahu walik (emoji placeholder)
-        JLabel lblIcon = new JLabel("🍽");
-        lblIcon.setFont(new Font("SansSerif", Font.PLAIN, 56));
-        lblIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
-        konten.add(lblIcon);
+        // Logo
+        JComponent logo = buatLogo(360, 200);
+        if (logo != null) {
+            konten.add(logo);
+            konten.add(Box.createVerticalStrut(24));
+        }
 
-        konten.add(Box.createVerticalStrut(20));
-
-        JLabel lblTitle = new JLabel("Tahu Walik");
-        lblTitle.setFont(new Font("Serif", Font.BOLD, 34));
+        JLabel lblTitle = new JLabel("CHIKAS");
+        lblTitle.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 34), 0.15f));
         lblTitle.setForeground(Tema.COKELAT);
         lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
         konten.add(lblTitle);
 
-        konten.add(Box.createVerticalStrut(8));
+        konten.add(Box.createVerticalStrut(6));
 
         JLabel lblTagline = new JLabel("Point of Sale System");
         lblTagline.setFont(new Font("SansSerif", Font.PLAIN, 14));
@@ -246,39 +242,67 @@ form.setOpaque(false);
         lblTagline.setAlignmentX(Component.CENTER_ALIGNMENT);
         konten.add(lblTagline);
 
-        konten.add(Box.createVerticalStrut(30));
+        konten.add(Box.createVerticalStrut(24));
 
-        // Info card di dalam banner
-        JPanel infoCard = new JPanel() {
+        // Kutipan: pil putih transparan, satu baris
+        JLabel lblQuote = new JLabel("Renyah di luar, lembut di dalam") {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.25f));
-                g2.setColor(Tema.COKELAT);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
+                g2.setColor(Color.WHITE);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        infoCard.setOpaque(false);
-        infoCard.setLayout(new BoxLayout(infoCard, BoxLayout.Y_AXIS));
-        infoCard.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
-        infoCard.setMaximumSize(new Dimension(280, 120));
-        infoCard.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel lblQuote = new JLabel("<html><div style='text-align:center;color:white;'>"
-                + "Renyah di luar,<br>lembut di dalam.<br>");
-               
-        lblQuote.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        lblQuote.setForeground(Color.WHITE);
+        lblQuote.setFont(new Font("SansSerif", Font.ITALIC, 13));
+        lblQuote.setForeground(Tema.COKELAT);
+        lblQuote.setOpaque(false);
+        lblQuote.setBorder(BorderFactory.createEmptyBorder(9, 22, 9, 22));
         lblQuote.setAlignmentX(Component.CENTER_ALIGNMENT);
-        infoCard.add(lblQuote);
-
-        konten.add(infoCard);
+        konten.add(lblQuote);
 
         banner.add(konten);
         return banner;
+    }
+
+    // ─── LOGO ─────────────────────────────────────────────────
+    /** Logo aplikasi: dari database (bisa diganti di Setting), atau logo bawaan. */
+    private BufferedImage muatLogo() {
+        return LogoToko.muat();
+    }
+
+    /** Komponen logo dengan sudut membulat, muat dalam kotak lebarMaks x tinggiMaks. Null kalau logo gagal dimuat. */
+    private JComponent buatLogo(int lebarMaks, int tinggiMaks) {
+        BufferedImage asli = muatLogo();
+        if (asli == null) return null;
+
+        double skala = Math.min((double) lebarMaks / asli.getWidth(), (double) tinggiMaks / asli.getHeight());
+        int lebar = Math.max(1, (int) Math.round(asli.getWidth() * skala));
+        int tinggi = Math.max(1, (int) Math.round(asli.getHeight() * skala));
+
+        // perkecil sekali dengan kualitas halus (2x ukuran tampil supaya tetap tajam)
+        BufferedImage gambar = LogoToko.skala(asli, lebar * 2, tinggi * 2);
+
+        JComponent c = new JComponent() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2.setClip(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 24, 24));
+                g2.drawImage(gambar, 0, 0, getWidth(), getHeight(), null);
+                g2.dispose();
+            }
+        };
+        Dimension d = new Dimension(lebar, tinggi);
+        c.setPreferredSize(d);
+        c.setMaximumSize(d);
+        c.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return c;
     }
 
     // ─── HELPER: label & text field ───────────────────────────

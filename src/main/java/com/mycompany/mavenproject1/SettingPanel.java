@@ -45,6 +45,8 @@ public class SettingPanel extends JPanel {
     JComboBox<Kat> cmbKat = new JComboBox<>();
     JLabel lblGambar = new JLabel("Belum ada gambar", SwingConstants.CENTER);
     byte[] gambarTerpilih;
+    JLabel lblLogo = new JLabel("", SwingConstants.CENTER);
+    byte[] logoBaru; // logo yang dipilih tapi belum disimpan
     int idMenu = 0;
 
     public SettingPanel() {
@@ -59,6 +61,7 @@ public class SettingPanel extends JPanel {
         tab.addTab("Toko & Struk", sisiKiri(buatKartuToko(), 520));
         tab.addTab("Kelola Menu", buatTabMenu());
         tab.addTab("Varian Rasa", sisiKiri(buatKartuRasa(), 640));
+        tab.addTab("Logo Aplikasi", sisiKiri(buatKartuLogo(), 520));
         add(tab, BorderLayout.CENTER);
 
         segarkan();
@@ -539,6 +542,108 @@ public class SettingPanel extends JPanel {
         return k;
     }
 
+    // =====================================================
+    //  TAB 4: LOGO APLIKASI
+    // =====================================================
+    Tema.Kartu buatKartuLogo() {
+        lblLogo.setOpaque(true);
+        lblLogo.setBackground(Color.WHITE);
+        lblLogo.setForeground(Tema.ABU);
+        lblLogo.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
+        lblLogo.setPreferredSize(new Dimension(0, 210));
+
+        JLabel petunjuk = new JLabel("<html>Logo tampil di halaman login dan jadi ikon aplikasi. "
+                + "Pakai gambar landscape (lebar) supaya hasilnya paling bagus. "
+                + "Perubahan terlihat di halaman login berikutnya (setelah logout).</html>");
+        petunjuk.setForeground(Tema.ABU);
+
+        JButton btnPilih = new JButton("Pilih Gambar...");
+        btnPilih.setFocusPainted(false);
+        btnPilih.addActionListener(e -> pilihLogo());
+        JButton btnSimpan = Tema.tombol("Simpan Logo", Tema.KUNING);
+        btnSimpan.addActionListener(e -> simpanLogo());
+        JButton btnBawaan = new JButton("Kembalikan Bawaan");
+        btnBawaan.setFocusPainted(false);
+        btnBawaan.addActionListener(e -> kembalikanLogoBawaan());
+
+        JPanel tombol = new JPanel(new GridLayout(1, 3, 8, 0));
+        tombol.setOpaque(false);
+        tombol.add(btnPilih);
+        tombol.add(btnSimpan);
+        tombol.add(btnBawaan);
+
+        JPanel bawah = new JPanel(new BorderLayout(0, 10));
+        bawah.setOpaque(false);
+        bawah.add(petunjuk, BorderLayout.NORTH);
+        bawah.add(tombol, BorderLayout.SOUTH);
+
+        Tema.Kartu k = new Tema.Kartu();
+        k.setLayout(new BorderLayout(0, 12));
+        k.add(new JLabel("<html><b>Logo Aplikasi</b></html>"), BorderLayout.NORTH);
+        JPanel tengah = new JPanel(new BorderLayout(0, 12));
+        tengah.setOpaque(false);
+        tengah.add(lblLogo, BorderLayout.NORTH);
+        tengah.add(bawah, BorderLayout.CENTER);
+        k.add(tengah, BorderLayout.CENTER);
+        return k;
+    }
+
+    private void pilihLogo() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Pilih logo aplikasi");
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Gambar (JPG, PNG, GIF, WebP)", "jpg", "jpeg", "png", "gif", "webp"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        try {
+            BufferedImage image = ImageIO.read(chooser.getSelectedFile());
+            if (image == null) throw new IOException("File bukan gambar yang didukung.");
+            logoBaru = LogoToko.keBytes(image);
+            tampilkanLogo(ImageIO.read(new ByteArrayInputStream(logoBaru)));
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal membaca gambar: " + ex.getMessage());
+        }
+    }
+
+    private void simpanLogo() {
+        if (logoBaru == null) {
+            JOptionPane.showMessageDialog(this, "Pilih gambar dulu dengan tombol \"Pilih Gambar...\".");
+            return;
+        }
+        try {
+            LogoToko.simpan(logoBaru);
+            logoBaru = null;
+            JOptionPane.showMessageDialog(this, "Logo tersimpan. Akan tampil di halaman login berikutnya.");
+        } catch (SQLException ex) {
+            Db.error(ex);
+        }
+    }
+
+    private void kembalikanLogoBawaan() {
+        int ok = JOptionPane.showConfirmDialog(this, "Kembalikan logo ke bawaan?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+        try {
+            LogoToko.hapus();
+            logoBaru = null;
+            tampilkanLogo(LogoToko.muat());
+        } catch (SQLException ex) {
+            Db.error(ex);
+        }
+    }
+
+    /** Menampilkan pratinjau logo di dalam kotak, proporsi tetap. */
+    private void tampilkanLogo(BufferedImage image) {
+        if (image == null) {
+            lblLogo.setIcon(null);
+            lblLogo.setText("Logo tidak tersedia");
+            return;
+        }
+        double s = Math.min(440.0 / image.getWidth(), 190.0 / image.getHeight());
+        int w = Math.max(1, (int) Math.round(image.getWidth() * s));
+        int h = Math.max(1, (int) Math.round(image.getHeight() * s));
+        lblLogo.setText("");
+        lblLogo.setIcon(new ImageIcon(LogoToko.skala(image, w, h)));
+    }
+
     public void segarkan() {
         txtToko.setText(Pengaturan.get("namaToko", "Tahu Walik"));
         txtAlamat.setText(Pengaturan.get("alamat", ""));
@@ -553,6 +658,8 @@ public class SettingPanel extends JPanel {
         chkOtomatis.setSelected("1".equals(Pengaturan.get("otomatis", "0")));
         muatRasa();
         muatMenu();
+        logoBaru = null;
+        tampilkanLogo(LogoToko.muat());
     }
 
     void muatRasa() {

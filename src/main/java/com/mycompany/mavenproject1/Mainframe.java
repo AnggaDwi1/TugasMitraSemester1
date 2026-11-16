@@ -29,7 +29,7 @@ public class Mainframe extends JFrame {
     KeyEventDispatcher rfidDispatcher;
 
     public Mainframe() {
-        setTitle("Kasir Tahu Walik");
+        setTitle("CHIKAS - Kasir");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1200, 700);
         setLocationRelativeTo(null);
@@ -156,26 +156,51 @@ void logoutOtomatis() {
         return l;
     }
 
-    JPanel buatSidebar() {
-        // ----- merek: lencana bulat + nama toko -----
-        JPanel merek = new JPanel(new BorderLayout(12, 0));
-        merek.setOpaque(false);
-        merek.setBorder(BorderFactory.createEmptyBorder(2, 6, 0, 6));
-        merek.add(Tema.avatarCincin("TW", 48, Tema.COKELAT, Tema.KUNING), BorderLayout.WEST);
+    /** Logo untuk sidebar: sudut membulat, proporsi tetap, muat dalam kotak lebarMaks x tinggiMaks. Null kalau logo gagal dimuat. */
+    JComponent buatLogoSidebar(int lebarMaks, int tinggiMaks) {
+        java.awt.image.BufferedImage asli = LogoToko.muat();
+        if (asli == null) return null;
 
-        JLabel l1 = new JLabel("Tahu Walik");
-        l1.setFont(new Font("SansSerif", Font.BOLD, 19));
-        l1.setForeground(Tema.COKELAT);
-        l1.setVerticalAlignment(SwingConstants.BOTTOM);
-        JLabel l2 = new JLabel("CHIKA CHIKU");
-        l2.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 10), 0.18f));
-        l2.setForeground(Tema.ABU);
-        l2.setVerticalAlignment(SwingConstants.TOP);
-        JPanel teksMerek = new JPanel(new GridLayout(2, 1, 0, 1));
-        teksMerek.setOpaque(false);
-        teksMerek.add(l1);
-        teksMerek.add(l2);
-        merek.add(teksMerek, BorderLayout.CENTER);
+        double skala = Math.min((double) lebarMaks / asli.getWidth(), (double) tinggiMaks / asli.getHeight());
+        int lebar = Math.max(1, (int) Math.round(asli.getWidth() * skala));
+        int tinggi = Math.max(1, (int) Math.round(asli.getHeight() * skala));
+        java.awt.image.BufferedImage gambar = LogoToko.skala(asli, lebar * 2, tinggi * 2);
+
+        JComponent c = new JComponent() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                // gambar di tengah kotak, proporsi asli dijaga
+                double s = Math.min((double) getWidth() / gambar.getWidth(), (double) getHeight() / gambar.getHeight());
+                int w = Math.max(1, (int) Math.round(gambar.getWidth() * s));
+                int h = Math.max(1, (int) Math.round(gambar.getHeight() * s));
+                int x = (getWidth() - w) / 2, y = (getHeight() - h) / 2;
+                g2.setClip(new java.awt.geom.RoundRectangle2D.Float(x, y, w, h, 18, 18));
+                g2.drawImage(gambar, x, y, w, h, null);
+                g2.dispose();
+            }
+        };
+        c.setPreferredSize(new Dimension(lebar, tinggi));
+        return c;
+    }
+
+    JPanel buatSidebar() {
+        // ----- merek: logo aplikasi (bisa diganti di Setting > Logo Aplikasi) -----
+        JPanel merek = new JPanel(new BorderLayout());
+        merek.setOpaque(false);
+        merek.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+        JComponent logo = buatLogoSidebar(216, 100);
+        if (logo != null) {
+            merek.add(logo, BorderLayout.CENTER);
+        } else {
+            JLabel cadangan = new JLabel("CHIKAS");
+            cadangan.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 22), 0.15f));
+            cadangan.setForeground(Tema.COKELAT);
+            merek.add(cadangan, BorderLayout.CENTER);
+        }
 
         // ----- menu navigasi -----
         JPanel nav = new JPanel(new GridLayout(0, 1, 0, 6));
