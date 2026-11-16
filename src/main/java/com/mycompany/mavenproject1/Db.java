@@ -41,6 +41,21 @@ public class Db {
         return m;
     }
 
+    /** Menambah kolom menu.dihapus (sekali saja) untuk fitur hapus menu yang sudah pernah terjual. */
+    public static void siapkanSkema() {
+        try (Connection c = Koneksi.get(); Statement s = c.createStatement()) {
+            boolean ada;
+            try (ResultSet rs = s.executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                  + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='menu' AND COLUMN_NAME='dihapus'")) {
+                ada = rs.next() && rs.getInt(1) > 0;
+            }
+            if (!ada) s.executeUpdate("ALTER TABLE menu ADD COLUMN dihapus TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (SQLException e) {
+            error(e);
+        }
+    }
+
     public static void error(Exception e) {
         JOptionPane.showMessageDialog(null, "Database error: " + e.getMessage());
     }

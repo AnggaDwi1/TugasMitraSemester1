@@ -147,74 +147,124 @@ void logoutOtomatis() {
         return s.toUpperCase();
     }
 
+    /** Label kecil huruf kapital di atas kelompok menu, misalnya "MENU UTAMA". */
+    JLabel labelBagian(String teks) {
+        JLabel l = new JLabel(teks);
+        l.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 10), 0.16f));
+        l.setForeground(Tema.ABU);
+        l.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 0));
+        return l;
+    }
+
     JPanel buatSidebar() {
-        // ----- kartu logo -----
-        Tema.Kartu logo = new Tema.Kartu().warna(Tema.KUNING);
-        logo.setLayout(new GridLayout(2, 1, 0, 0));
-        logo.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        JLabel l1 = new JLabel("TAHU WALIK", SwingConstants.CENTER);
-        l1.setFont(new Font("SansSerif", Font.BOLD, 20));
-        l1.setForeground(new Color(0x2B1A0E));
-        JLabel l2 = new JLabel("CHIKA CHIKU", SwingConstants.CENTER);
-        l2.setFont(new Font("SansSerif", Font.BOLD, 11));
-        l2.setForeground(Tema.COKELAT);
-        logo.add(l1);
-        logo.add(l2);
+        // ----- merek: lencana bulat + nama toko -----
+        JPanel merek = new JPanel(new BorderLayout(12, 0));
+        merek.setOpaque(false);
+        merek.setBorder(BorderFactory.createEmptyBorder(2, 6, 0, 6));
+        merek.add(Tema.avatarCincin("TW", 48, Tema.COKELAT, Tema.KUNING), BorderLayout.WEST);
+
+        JLabel l1 = new JLabel("Tahu Walik");
+        l1.setFont(new Font("SansSerif", Font.BOLD, 19));
+        l1.setForeground(Tema.COKELAT);
+        l1.setVerticalAlignment(SwingConstants.BOTTOM);
+        JLabel l2 = new JLabel("CHIKA CHIKU");
+        l2.setFont(Tema.renggang(new Font("SansSerif", Font.BOLD, 10), 0.18f));
+        l2.setForeground(Tema.ABU);
+        l2.setVerticalAlignment(SwingConstants.TOP);
+        JPanel teksMerek = new JPanel(new GridLayout(2, 1, 0, 1));
+        teksMerek.setOpaque(false);
+        teksMerek.add(l1);
+        teksMerek.add(l2);
+        merek.add(teksMerek, BorderLayout.CENTER);
 
         // ----- menu navigasi -----
         JPanel nav = new JPanel(new GridLayout(0, 1, 0, 6));
         nav.setOpaque(false);
         String[] nama = {"Dashboard", "Menu", "Transaksi", "Laporan", "Setting"};
         String[] kunci = {"dashboard", "menu", "transaksi", "laporan", "setting"};
+        String[] ikon = {"dashboard", "menu", "transaksi", "laporan", "setting"};
         for (int i = 0; i < nama.length; i++) {
             if (!"OWNER".equalsIgnoreCase(Sesi.roleKasir) && !"transaksi".equals(kunci[i])) continue;
             final int idx = i;
-            Tema.NavTombol b = new Tema.NavTombol(nama[i]);
+            Tema.NavTombol b = new Tema.NavTombol(nama[i], ikon[i]);
             b.addActionListener(e -> buka(kunci[idx], navTombol.indexOf(b)));
             navTombol.add(b);
             nav.add(b);
         }
-        JPanel navWrap = new JPanel(new BorderLayout());
-        navWrap.setOpaque(false);
-        navWrap.add(nav, BorderLayout.NORTH);
+        JPanel navList = new JPanel(new BorderLayout());
+        navList.setOpaque(false);
+        navList.add(nav, BorderLayout.NORTH);
 
-        JPanel atas = new JPanel(new BorderLayout(0, 20));
+        JPanel navWrap = new JPanel(new BorderLayout(0, 10));
+        navWrap.setOpaque(false);
+        navWrap.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.GARIS),
+                BorderFactory.createEmptyBorder(18, 0, 0, 0)));
+        navWrap.add(labelBagian("MENU UTAMA"), BorderLayout.NORTH);
+        navWrap.add(navList, BorderLayout.CENTER);
+
+        JPanel atas = new JPanel(new BorderLayout(0, 18));
         atas.setOpaque(false);
-        atas.add(logo, BorderLayout.NORTH);
+        atas.add(merek, BorderLayout.NORTH);
         atas.add(navWrap, BorderLayout.CENTER);
 
-        // ----- profil kasir + logout -----
-        Tema.Kartu profil = new Tema.Kartu().warna(Tema.CREAM);
-        profil.setLayout(new BorderLayout(10, 0));
-        profil.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        JLabel info = new JLabel("<html><b>" + Tema.esc(Sesi.namaKasir) + "</b><br>"
-                + "<span style='color:#1B9E6B;font-size:10px'>&#9679; "
-                + ("OWNER".equalsIgnoreCase(Sesi.roleKasir) ? "Owner" : "Karyawan") + "</span></html>");
-        profil.add(Tema.avatar(inisial(Sesi.namaKasir), 38), BorderLayout.WEST);
-        profil.add(info, BorderLayout.CENTER);
+        // ----- profil kasir -----
+        boolean owner = "OWNER".equalsIgnoreCase(Sesi.roleKasir);
+        JLabel lblNama = new JLabel(Sesi.namaKasir);
+        lblNama.setFont(new Font("SansSerif", Font.BOLD, 13));
+        lblNama.setForeground(Tema.COKELAT);
+        lblNama.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JButton btnLogout = new JButton("Logout");
-        btnLogout.setForeground(Tema.MERAH);
-        btnLogout.setFont(new Font("SansSerif", Font.BOLD, 13));
-        btnLogout.setContentAreaFilled(false);
-        btnLogout.setBorderPainted(false);
-        btnLogout.setFocusPainted(false);
-        btnLogout.setHorizontalAlignment(SwingConstants.LEFT);
-        btnLogout.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        btnLogout.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        Tema.Chip peran = owner
+                ? new Tema.Chip("Owner", Tema.KUNING, Tema.COKELAT)
+                : new Tema.Chip("Karyawan", new Color(0xDDF3EA), Tema.HIJAU);
+        JPanel peranWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        peranWrap.setOpaque(false);
+        peranWrap.add(peran);
+        peranWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+        peranWrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, peranWrap.getPreferredSize().height));
+
+        JPanel teksProfil = new JPanel();
+        teksProfil.setLayout(new BoxLayout(teksProfil, BoxLayout.Y_AXIS));
+        teksProfil.setOpaque(false);
+        teksProfil.add(Box.createVerticalGlue());
+        teksProfil.add(lblNama);
+        teksProfil.add(Box.createVerticalStrut(4));
+        teksProfil.add(peranWrap);
+        teksProfil.add(Box.createVerticalGlue());
+
+        Tema.Kartu profil = new Tema.Kartu().warna(Tema.CREAM);
+        profil.setLayout(new BorderLayout(12, 0));
+        profil.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        profil.add(Tema.avatarCincin(inisial(Sesi.namaKasir), 44, Tema.KUNING, Tema.COKELAT), BorderLayout.WEST);
+        profil.add(teksProfil, BorderLayout.CENTER);
+
+        // ----- logout -----
+        Tema.TombolKeluar btnLogout = new Tema.TombolKeluar("Logout");
         btnLogout.addActionListener(e -> logoutManual());
 
         JPanel bawah = new JPanel(new BorderLayout(0, 8));
         bawah.setOpaque(false);
+        bawah.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.GARIS),
+                BorderFactory.createEmptyBorder(14, 0, 0, 0)));
         bawah.add(profil, BorderLayout.NORTH);
         bawah.add(btnLogout, BorderLayout.SOUTH);
 
-        JPanel wrap = new JPanel(new BorderLayout());
-        wrap.setBackground(Color.WHITE);
-        wrap.setPreferredSize(new Dimension(230, 0));
+        // ----- bingkai sidebar: putih ke cream tipis -----
+        JPanel wrap = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setPaint(new GradientPaint(0, 0, Color.WHITE, 0, getHeight(), new Color(0xFFF9EC)));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        };
+        wrap.setPreferredSize(new Dimension(248, 0));
         wrap.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 0, 1, Tema.GARIS),
-                BorderFactory.createEmptyBorder(18, 14, 18, 14)));
+                BorderFactory.createEmptyBorder(22, 14, 18, 14)));
         wrap.add(atas, BorderLayout.NORTH);
         wrap.add(bawah, BorderLayout.SOUTH);
         return wrap;

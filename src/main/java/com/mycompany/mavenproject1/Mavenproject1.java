@@ -29,6 +29,8 @@ public class Mavenproject1 {
         UIManager.put("ScrollBar.thumbInsets", new java.awt.Insets(2, 2, 2, 2));
         UIManager.put("ScrollPane.border", javax.swing.BorderFactory.createEmptyBorder());
 
+        Db.siapkanSkema();
+
         // 3. Buka halaman Login Frame sebagai tampilan pertama
         SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
     }

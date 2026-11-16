@@ -67,29 +67,47 @@ public class TransaksiPanel extends JPanel {
     /** Kotak "foto" menu: kotak kuning muda dengan huruf depan nama menu. */
     static class Foto extends JPanel {
         final String huruf;
-        final Image gambar;
+        final BufferedImage gambar;
         Foto(String nama, byte[] bytes) {
             setOpaque(false);
             setPreferredSize(new Dimension(0, 84));
             huruf = nama.isEmpty() ? "?" : nama.substring(0, 1).toUpperCase();
-            Image loaded = null;
+            BufferedImage loaded = null;
             if (bytes != null) try {
                 BufferedImage original = ImageIO.read(new ByteArrayInputStream(bytes));
-                if (original != null) loaded = original.getScaledInstance(240, 120, Image.SCALE_SMOOTH);
+                if (original != null) loaded = kecilkan(original, 480);
             } catch (IOException ignored) { }
             gambar = loaded;
         }
+        /** Kecilkan gambar (rasio tetap) supaya hemat memori. */
+        static BufferedImage kecilkan(BufferedImage src, int lebarMaks) {
+            if (src.getWidth() <= lebarMaks) return src;
+            int h = Math.max(1, Math.round(src.getHeight() * (float) lebarMaks / src.getWidth()));
+            BufferedImage out = new BufferedImage(lebarMaks, h, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(src.getScaledInstance(lebarMaks, h, Image.SCALE_SMOOTH), 0, 0, null);
+            g.dispose();
+            return out;
+        }
+
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g2.setColor(Tema.KUNING_MUDA);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
             if (gambar != null) {
                 Shape oldClip = g2.getClip();
                 g2.clip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 14, 14));
-                g2.drawImage(gambar, 0, 0, getWidth(), getHeight(), this);
+                // "cover": gambar memenuhi kotak, rasio asli dijaga, kelebihan dipotong di tengah
+                double s = Math.max((double) getWidth() / gambar.getWidth(), (double) getHeight() / gambar.getHeight());
+                int dw = (int) Math.ceil(gambar.getWidth() * s);
+                int dh = (int) Math.ceil(gambar.getHeight() * s);
+                g2.drawImage(gambar, (getWidth() - dw) / 2, (getHeight() - dh) / 2, dw, dh, null);
                 g2.setClip(oldClip);
             } else {
                 g2.setColor(Tema.COKELAT);
@@ -342,7 +360,7 @@ public class TransaksiPanel extends JPanel {
     // ---------- kartu menu ----------
     void muatMenu() {
         gridMenu.removeAll();
-        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar, stok FROM menu WHERE status='tersedia'");
+        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar, stok FROM menu WHERE status='tersedia' AND dihapus=0");
         if (idKategoriAktif > 0) sql.append(" AND id_kategori=?");
         String cari = txtCari.getText().trim().toLowerCase();
         if (!cari.isEmpty()) sql.append(" AND LOWER(nama_menu) LIKE ?");

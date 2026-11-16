@@ -258,7 +258,7 @@ public class SettingPanel extends JPanel {
         tblMenu.setModel(Db.kueri(
                 "SELECT m.id_menu, m.nama_menu, COALESCE(k.nama_kategori,'-'), CAST(m.harga AS UNSIGNED), "
               + "m.status, COALESCE(m.deskripsi,''), m.stok "
-              + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori ORDER BY m.id_menu",
+              + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori WHERE m.dihapus=0 ORDER BY m.id_menu",
                 new String[]{"ID", "Menu", "Kategori", "Harga", "Status", "Deskripsi", "Stok"}));
         kosongkanMenu();
     }
@@ -421,28 +421,39 @@ public class SettingPanel extends JPanel {
                 "Konfirmasi", JOptionPane.YES_NO_OPTION);
         if (ok != JOptionPane.YES_OPTION) return;
 
+        final int id = idMenu;
+        String info = null;
         try (Connection c = Koneksi.get()) {
             c.setAutoCommit(false);
             try {
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM menu_varian WHERE id_menu=?")) {
-                    ps.setInt(1, idMenu);
+                    ps.setInt(1, id);
                     ps.executeUpdate();
                 }
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM menu WHERE id_menu=?")) {
-                    ps.setInt(1, idMenu);
+                    ps.setInt(1, id);
                     ps.executeUpdate();
                 }
                 c.commit();
             } catch (SQLException e) {
                 c.rollback();
-                throw e;
+                // 1451 = masih dipakai tabel lain (menu sudah pernah terjual)
+                if (e.getErrorCode() != 1451 && !(e instanceof java.sql.SQLIntegrityConstraintViolationException)) throw e;
+                // Riwayat penjualan harus tetap utuh, jadi menu disembunyikan dari semua daftar.
+                try (PreparedStatement ps = c.prepareStatement("UPDATE menu SET dihapus=1 WHERE id_menu=?")) {
+                    ps.setInt(1, id);
+                    ps.executeUpdate();
+                }
+                c.commit();
+                info = "Menu ini sudah pernah terjual, jadi dihapus dari daftar menu.\n"
+                     + "Riwayat transaksi dan laporan penjualan tetap tersimpan.";
             }
-            muatMenu();
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Menu tidak bisa dihapus karena sudah pernah terjual.\n"
-                  + "Ubah statusnya menjadi \"habis\" saja.");
+            Db.error(e);
+            return;
         }
+        muatMenu();
+        if (info != null) JOptionPane.showMessageDialog(this, info);
     }
 
     // ----- gambar menu -----
