@@ -36,6 +36,12 @@ public class Pengaturan {
 
     /** Jumlah karakter per baris. Makin sedikit karakter, makin besar hurufnya. */
     public static int lebar() {
-        return (kertasMm() == 58 ? LEBAR_58MM : LEBAR_80MM)[ukuran()];
+        return lebar(kertasMm(), ukuran());
+    }
+
+    /** Jumlah karakter per baris untuk kombinasi kertas (80/58 mm) dan ukuran (0..2) tertentu. Dipakai juga oleh pratinjau struk. */
+    public static int lebar(int kertasMm, int ukuran) {
+        int u = Math.max(0, Math.min(2, ukuran));
+        return (kertasMm == 58 ? LEBAR_58MM : LEBAR_80MM)[u];
     }
 }

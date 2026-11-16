@@ -19,10 +19,6 @@ public class Struk {
     //  ISI STRUK (teks)
     // =====================================================
     public static String bangun(int idTransaksi) throws SQLException {
-        int L = Pengaturan.lebar();
-        String garis = "-".repeat(L);
-        StringBuilder sb = new StringBuilder();
-
         String sql = "SELECT t.kode_transaksi, t.tanggal, t.total_harga, t.status, "
                 + "m.nama_menu, r.nama_rasa, d.jumlah, d.harga_satuan, d.subtotal, d.catatan, "
                 + "p.metode, p.jumlah_bayar, p.kembalian "
@@ -36,19 +32,15 @@ public class Struk {
         try (Connection c = Koneksi.get(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idTransaksi);
             try (ResultSet rs = ps.executeQuery()) {
-                boolean awal = true;
+                List<ItemStruk> items = new ArrayList<>();
+                String kode = "", waktu = "", metode = "-";
+                boolean batal = false, awal = true;
                 double total = 0, bayar = 0, kembali = 0;
-                String metode = "-";
                 while (rs.next()) {
                     if (awal) {
-                        tambah(sb, tengah(Pengaturan.get("namaToko", "CHIKA CHIKU").toUpperCase(), L), L);
-                        String alamat = Pengaturan.get("alamat", "");
-                        if (!alamat.isBlank()) tambah(sb, tengah(alamat, L), L);
-                        sb.append(garis).append("\n");
-                        sb.append(rs.getString("kode_transaksi")).append("\n");
-                        sb.append(rs.getTimestamp("tanggal").toString(), 0, 16).append("\n");
-                        if ("batal".equals(rs.getString("status"))) sb.append("** DIBATALKAN **\n");
-                        sb.append(garis).append("\n");
+                        kode = rs.getString("kode_transaksi");
+                        waktu = rs.getTimestamp("tanggal").toString().substring(0, 16);
+                        batal = "batal".equals(rs.getString("status"));
                         total = rs.getDouble("total_harga");
                         bayar = rs.getDouble("jumlah_bayar");
                         kembali = rs.getDouble("kembalian");
@@ -56,21 +48,75 @@ public class Struk {
                         awal = false;
                     }
                     String rasa = rs.getString("nama_rasa");
-                    tambah(sb, rs.getString("nama_menu") + (rasa != null ? " (" + rasa + ")" : ""), L);
-                    sb.append(baris("  " + rs.getInt("jumlah") + " x " + Tema.num(rs.getDouble("harga_satuan")),
-                            Tema.num(rs.getDouble("subtotal")), L)).append("\n");
-                    String cat = rs.getString("catatan");
-                    if (cat != null && !cat.isBlank()) tambah(sb, "  *" + cat, L);
+                    items.add(new ItemStruk(
+                            rs.getString("nama_menu") + (rasa != null ? " (" + rasa + ")" : ""),
+                            rs.getInt("jumlah"), rs.getDouble("harga_satuan"), rs.getDouble("subtotal"),
+                            rs.getString("catatan")));
                 }
                 if (awal) return "Transaksi tidak ditemukan";
-                sb.append(garis).append("\n");
-                sb.append(baris("TOTAL", Tema.num(total), L)).append("\n");
-                sb.append(baris("Bayar (" + metode + ")", Tema.num(bayar), L)).append("\n");
-                sb.append(baris("Kembali", Tema.num(kembali), L)).append("\n");
-                sb.append(garis).append("\n");
-                tambah(sb, tengah(Pengaturan.get("footer", "Terima kasih!"), L), L);
+                return render(Pengaturan.lebar(),
+                        Pengaturan.get("namaToko", "CHIKA CHIKU"),
+                        Pengaturan.get("alamat", ""),
+                        Pengaturan.get("footer", "Terima kasih!"),
+                        kode, waktu, batal, items, total, bayar, kembali, metode);
             }
         }
+    }
+
+    /** Contoh struk untuk pratinjau di Setting. Tata letaknya sama persis dengan struk asli (lewat render). */
+    public static String contoh(String namaToko, String alamat, String footer, int lebar) {
+        List<ItemStruk> items = new ArrayList<>();
+        items.add(new ItemStruk("Ayam Pok Pok (Original)", 2, 10000, 20000, null));
+        items.add(new ItemStruk("Tahu Walik Chika Chiku (Pedas)", 1, 10000, 10000, "tidak pakai saus"));
+        items.add(new ItemStruk("Mie Chikmong", 3, 8000, 24000, null));
+        java.time.LocalDateTime sekarang = java.time.LocalDateTime.now();
+        String kode = "TRX-" + sekarang.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "-001";
+        String waktu = sekarang.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        return render(lebar, namaToko, alamat, footer, kode, waktu, false, items, 54000, 60000, 6000, "CASH");
+    }
+
+    /** Satu baris pesanan di struk. */
+    static class ItemStruk {
+        final String nama, catatan;
+        final int jumlah;
+        final double harga, subtotal;
+
+        ItemStruk(String nama, int jumlah, double harga, double subtotal, String catatan) {
+            this.nama = nama;
+            this.jumlah = jumlah;
+            this.harga = harga;
+            this.subtotal = subtotal;
+            this.catatan = catatan;
+        }
+    }
+
+    /** Menyusun teks struk. Dipakai oleh struk asli dan oleh pratinjau, supaya bentuknya selalu sama. */
+    static String render(int L, String namaToko, String alamat, String footer,
+                         String kode, String waktu, boolean batal, List<ItemStruk> items,
+                         double total, double bayar, double kembali, String metode) {
+        String garis = "-".repeat(L);
+        StringBuilder sb = new StringBuilder();
+
+        tambah(sb, tengah(namaToko.toUpperCase(), L), L);
+        if (!alamat.isBlank()) tambah(sb, tengah(alamat, L), L);
+        sb.append(garis).append("\n");
+        sb.append(kode).append("\n");
+        sb.append(waktu).append("\n");
+        if (batal) sb.append("** DIBATALKAN **\n");
+        sb.append(garis).append("\n");
+
+        for (ItemStruk it : items) {
+            tambah(sb, it.nama, L);
+            sb.append(baris("  " + it.jumlah + " x " + Tema.num(it.harga), Tema.num(it.subtotal), L)).append("\n");
+            if (it.catatan != null && !it.catatan.isBlank()) tambah(sb, "  *" + it.catatan, L);
+        }
+
+        sb.append(garis).append("\n");
+        sb.append(baris("TOTAL", Tema.num(total), L)).append("\n");
+        sb.append(baris("Bayar (" + metode + ")", Tema.num(bayar), L)).append("\n");
+        sb.append(baris("Kembali", Tema.num(kembali), L)).append("\n");
+        sb.append(garis).append("\n");
+        tambah(sb, tengah(footer, L), L);
         return sb.toString();
     }
 
