@@ -17,6 +17,7 @@ public class LaporanPanel extends JPanel {
     private final JLabel lblOmzet = new JLabel("Rp 0");
     private final JLabel lblCash = new JLabel("Rp 0");
     private final JLabel lblQris = new JLabel("Rp 0");
+    private final JLabel lblMidtrans = new JLabel("Rp 0");
     private final JTable tblTransaksi = new JTable();
     private final JTable tblMenu = new JTable();
     private final JTabbedPane tab = new JTabbedPane();
@@ -57,12 +58,13 @@ public class LaporanPanel extends JPanel {
         header.add(Tema.judul("Laporan"), BorderLayout.NORTH);
         header.add(filter, BorderLayout.CENTER);
 
-        JPanel stats = new JPanel(new GridLayout(1, 4, 12, 0));
+        JPanel stats = new JPanel(new GridLayout(1, 5, 12, 0));
         stats.setOpaque(false);
         stats.add(Tema.kartuStat("Transaksi Selesai", lblTransaksi));
         stats.add(Tema.kartuStat("Total Omzet", lblOmzet));
         stats.add(Tema.kartuStat("Pembayaran Cash", lblCash));
         stats.add(Tema.kartuStat("Pembayaran QRIS", lblQris));
+        stats.add(Tema.kartuStat("Pembayaran Midtrans", lblMidtrans));
 
         Tema.gayaTabel(tblTransaksi);
         Tema.gayaTabel(tblMenu);
@@ -92,6 +94,7 @@ public class LaporanPanel extends JPanel {
         lblOmzet.setText(Tema.rp(Db.angka("SELECT COALESCE(SUM(t.total_harga),0) FROM transaksi t WHERE " + selesai)));
         lblCash.setText(Tema.rp(Db.angka("SELECT COALESCE(SUM(p.jumlah_bayar-p.kembalian),0) FROM pembayaran p JOIN transaksi t ON t.id_transaksi=p.id_transaksi WHERE p.metode='cash' AND " + selesai)));
         lblQris.setText(Tema.rp(Db.angka("SELECT COALESCE(SUM(p.jumlah_bayar),0) FROM pembayaran p JOIN transaksi t ON t.id_transaksi=p.id_transaksi WHERE p.metode='qris' AND " + selesai)));
+        lblMidtrans.setText(Tema.rp(Db.angka("SELECT COALESCE(SUM(p.jumlah_bayar),0) FROM pembayaran p JOIN transaksi t ON t.id_transaksi=p.id_transaksi WHERE p.metode='midtrans' AND " + selesai)));
         tblTransaksi.setModel(Db.kueri(
             "SELECT t.kode_transaksi, DATE_FORMAT(t.tanggal,'%d/%m/%Y %H:%i'), COALESCE(k.nama_kasir,'-'), CAST(t.total_harga AS UNSIGNED), COALESCE(p.metode,'-'), t.status " +
             "FROM transaksi t LEFT JOIN kasir k ON k.id_kasir=t.id_kasir LEFT JOIN pembayaran p ON p.id_transaksi=t.id_transaksi WHERE " + rentang + " ORDER BY t.tanggal DESC",

@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.Desktop;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -113,6 +114,7 @@ public class TransaksiPanel extends JPanel {
     JLabel lblTotal = new JLabel("Rp 0");
     JToggleButton rbCash = new JToggleButton("Cash", true);
     JToggleButton rbQris = new JToggleButton("QRIS");
+    JToggleButton rbMidtrans = new JToggleButton("Midtrans");
     JTextField txtBayar = new JTextField(10);
     JLabel lblKembali = new JLabel("Rp 0");
     List<Item> keranjang = new ArrayList<>();
@@ -223,14 +225,18 @@ public class TransaksiPanel extends JPanel {
         ButtonGroup grup = new ButtonGroup();
         grup.add(rbCash);
         grup.add(rbQris);
+        grup.add(rbMidtrans);
         rbCash.setFocusPainted(false);
         rbQris.setFocusPainted(false);
+        rbMidtrans.setFocusPainted(false);
         rbCash.addActionListener(e -> aturMetode());
         rbQris.addActionListener(e -> aturMetode());
-        JPanel metode = new JPanel(new GridLayout(1, 2, 8, 0));
+        rbMidtrans.addActionListener(e -> aturMetode());
+        JPanel metode = new JPanel(new GridLayout(1, 3, 8, 0));
         metode.setOpaque(false);
         metode.add(rbCash);
         metode.add(rbQris);
+        metode.add(rbMidtrans);
 
         txtBayar.putClientProperty("JTextField.placeholderText", "Uang diterima");
         txtBayar.addKeyListener(new java.awt.event.KeyAdapter() {
@@ -563,7 +569,7 @@ public class TransaksiPanel extends JPanel {
     }
 
     void hitungKembali() {
-        if (rbQris.isSelected()) { lblKembali.setText("Rp 0"); return; }
+        if (!rbCash.isSelected()) { lblKembali.setText("Rp 0"); return; }
         try {
             double bayar = Double.parseDouble(txtBayar.getText().trim());
             lblKembali.setText(Tema.rp(Math.max(0, bayar - total())));
@@ -587,7 +593,19 @@ public class TransaksiPanel extends JPanel {
         }
         double total = total();
         double bayar = total, kembali = 0;
-        String metode = rbQris.isSelected() ? "qris" : "cash";
+        boolean midtrans = rbMidtrans.isSelected();
+        String metode = rbQris.isSelected() ? "qris" : (midtrans ? "midtrans" : "cash");
+
+        if (midtrans) {
+            try {
+                MidtransClient.ensureReady();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Backend Midtrans belum aktif atau migrasi database belum dijalankan.\n" + ex.getMessage(),
+                        "Midtrans Sandbox", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+        }
 
         if (rbCash.isSelected()) {
             try {
@@ -601,7 +619,7 @@ public class TransaksiPanel extends JPanel {
                 return;
             }
             kembali = bayar - total;
-        } else {
+        } else if (rbQris.isSelected()) {
             // QRIS statis: pastikan kasir sudah melihat notifikasi uang masuk
             int ok = JOptionPane.showConfirmDialog(this,
                     "Apakah pembayaran QRIS " + Tema.rp(total) + " sudah masuk\n(cek notifikasi / soundbox)?",
@@ -610,6 +628,7 @@ public class TransaksiPanel extends JPanel {
         }
 
         int idTrx;
+        String kodeTransaksi;
         try (Connection c = Koneksi.get()) {
             c.setAutoCommit(false);
             try {
@@ -619,15 +638,16 @@ public class TransaksiPanel extends JPanel {
                      ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM transaksi WHERE DATE(tanggal)=CURDATE()")) {
                     if (rs.next()) urut = rs.getInt(1) + 1;
                 }
-                String kode = String.format("TRX-%s-%03d",
+                kodeTransaksi = String.format("TRX-%s-%03d",
                         new SimpleDateFormat("yyyyMMdd").format(new java.util.Date()), urut);
 
                 // 2. header
                 try (PreparedStatement ps = c.prepareStatement(
-                        "INSERT INTO transaksi (kode_transaksi, total_harga, status) VALUES (?,?,'selesai')",
+                        "INSERT INTO transaksi (kode_transaksi, total_harga, status) VALUES (?,?,?)",
                         Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setString(1, kode);
+                    ps.setString(1, kodeTransaksi);
                     ps.setDouble(2, total);
+                    ps.setString(3, midtrans ? "pending" : "selesai");
                     ps.executeUpdate();
                     try (ResultSet k = ps.getGeneratedKeys()) { k.next(); idTrx = k.getInt(1); }
                 }
@@ -650,23 +670,31 @@ public class TransaksiPanel extends JPanel {
 
                 // 3b. kurangi stok menu
                 try (PreparedStatement ps = c.prepareStatement(
-                        "UPDATE menu SET stok = stok - ? WHERE id_menu = ?")) {
+                        "UPDATE menu SET stok = stok - ? WHERE id_menu = ? AND stok >= ?")) {
                     for (Item it : keranjang) {
                         ps.setInt(1, it.qty);
                         ps.setInt(2, it.idMenu);
+                        ps.setInt(3, it.qty);
                         ps.addBatch();
                     }
-                    ps.executeBatch();
+                    int[] hasilStok = ps.executeBatch();
+                    for (int hasil : hasilStok) {
+                        if (hasil == 0 || hasil == Statement.EXECUTE_FAILED) {
+                            throw new SQLException("Stok berubah atau tidak cukup. Muat ulang menu lalu coba lagi.");
+                        }
+                    }
                 }
 
                 // 4. pembayaran
-                try (PreparedStatement ps = c.prepareStatement(
-                        "INSERT INTO pembayaran (id_transaksi, metode, jumlah_bayar, kembalian) VALUES (?,?,?,?)")) {
-                    ps.setInt(1, idTrx);
-                    ps.setString(2, metode);
-                    ps.setDouble(3, bayar);
-                    ps.setDouble(4, kembali);
-                    ps.executeUpdate();
+                if (!midtrans) {
+                    try (PreparedStatement ps = c.prepareStatement(
+                            "INSERT INTO pembayaran (id_transaksi, metode, jumlah_bayar, kembalian) VALUES (?,?,?,?)")) {
+                        ps.setInt(1, idTrx);
+                        ps.setString(2, metode);
+                        ps.setDouble(3, bayar);
+                        ps.setDouble(4, kembali);
+                        ps.executeUpdate();
+                    }
                 }
                 c.commit();
             } catch (SQLException e) {
@@ -678,12 +706,68 @@ public class TransaksiPanel extends JPanel {
             return;
         }
 
+        if (midtrans) {
+            final String orderId = kodeTransaksi;
+            final String redirect;
+            try {
+                redirect = MidtransClient.createSnap(orderId);
+            } catch (Exception ex) {
+                MidtransClient.cancelPending(orderId);
+                muatMenu();
+                JOptionPane.showMessageDialog(this, "Pembayaran Midtrans gagal dibuat. Stok sudah dikembalikan.\n" + ex.getMessage(),
+                        "Midtrans Sandbox", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            reset();
+            muatMenu();
+            try {
+                if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(java.net.URI.create(redirect));
+                else throw new UnsupportedOperationException("Browser tidak tersedia pada komputer ini.");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Buka halaman pembayaran ini secara manual:\n" + redirect,
+                        "Midtrans Sandbox", JOptionPane.INFORMATION_MESSAGE);
+            }
+            mulaiPantauMidtrans(orderId, idTrx);
+            JOptionPane.showMessageDialog(this,
+                    "Transaksi " + orderId + " menunggu pembayaran.\nSelesaikan pembayaran di halaman Midtrans; aplikasi akan memperbarui status otomatis selama tetap terbuka.",
+                    "Midtrans Sandbox", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
         reset();
         muatMenu();
         muatRiwayat();
         // struk dicetak SETELAH data tersimpan
         if ("1".equals(Pengaturan.get("otomatis", "0"))) Struk.cetakLangsung(this, idTrx);
         else Struk.tampil(this, idTrx);
+    }
+
+    private void mulaiPantauMidtrans(String orderId, int idTrx) {
+        Thread monitor = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    String status = MidtransClient.checkStatus(orderId);
+                    if ("selesai".equalsIgnoreCase(status) || "batal".equalsIgnoreCase(status)) {
+                        javax.swing.SwingUtilities.invokeLater(() -> {
+                            muatMenu();
+                            muatRiwayat();
+                            if ("selesai".equalsIgnoreCase(status)) {
+                                JOptionPane.showMessageDialog(this, "Pembayaran " + orderId + " berhasil terverifikasi.");
+                                if ("1".equals(Pengaturan.get("otomatis", "0"))) Struk.cetakLangsung(this, idTrx);
+                                else Struk.tampil(this, idTrx);
+                            } else {
+                                JOptionPane.showMessageDialog(this, "Pembayaran " + orderId + " gagal/kedaluwarsa. Stok dikembalikan.");
+                            }
+                        });
+                        return;
+                    }
+                } catch (Exception ignored) { }
+                try { Thread.sleep(5000); }
+                catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+            }
+        }, "midtrans-status-" + orderId);
+        monitor.setDaemon(true);
+        monitor.start();
     }
 
     // =====================================================
