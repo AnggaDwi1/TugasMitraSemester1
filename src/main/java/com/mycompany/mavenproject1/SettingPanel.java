@@ -25,6 +25,10 @@ public class SettingPanel extends JPanel {
     JTextField txtToko = new JTextField();
     JTextField txtAlamat = new JTextField();
     JTextField txtFooter = new JTextField();
+    // data toko (terpisah dari struk)
+    JTextField txtInfoNama = new JTextField();
+    JTextField txtInfoAlamat = new JTextField();
+    JTextField txtInfoTelp = new JTextField();
     JComboBox<String> cmbKertas = new JComboBox<>(new String[]{"80 mm", "58 mm"});
     JComboBox<String> cmbUkuran = new JComboBox<>(new String[]{"Kecil", "Sedang", "Besar"});
     JComboBox<String> cmbPrinter = new JComboBox<>();
@@ -45,6 +49,8 @@ public class SettingPanel extends JPanel {
     JComboBox<Kat> cmbKat = new JComboBox<>();
     JLabel lblGambar = new JLabel("Belum ada gambar", SwingConstants.CENTER);
     byte[] gambarTerpilih;
+    JLabel lblLogo = new JLabel("", SwingConstants.CENTER);
+    byte[] logoBaru; // logo yang dipilih tapi belum disimpan
     int idMenu = 0;
 
     public SettingPanel() {
@@ -56,9 +62,11 @@ public class SettingPanel extends JPanel {
         JTabbedPane tab = new JTabbedPane();
         tab.setFont(new Font("SansSerif", Font.BOLD, 13));
         tab.setOpaque(false);
-        tab.addTab("Toko & Struk", sisiKiri(buatKartuToko(), 520));
+        tab.addTab("Toko", sisiKiri(buatKartuToko(), 520));
+        tab.addTab("Struk", buatTabStruk());
         tab.addTab("Kelola Menu", buatTabMenu());
         tab.addTab("Varian Rasa", sisiKiri(buatKartuRasa(), 640));
+        tab.addTab("Logo Aplikasi", sisiKiri(buatKartuLogo(), 520));
         add(tab, BorderLayout.CENTER);
 
         segarkan();
@@ -75,28 +83,24 @@ public class SettingPanel extends JPanel {
     }
 
     // =====================================================
-    //  TAB 1: INFO TOKO & STRUK
+    //  TAB 1: INFO TOKO (tidak terkait struk)
     // =====================================================
     Tema.Kartu buatKartuToko() {
         JPanel form = new JPanel(new GridLayout(0, 1, 0, 4));
         form.setOpaque(false);
-        form.add(new JLabel("Nama toko (di struk)"));  form.add(txtToko);
-        form.add(new JLabel("Alamat (di struk)"));     form.add(txtAlamat);
-        form.add(new JLabel("Pesan bawah struk"));     form.add(txtFooter);
-        form.add(new JLabel("Lebar kertas"));          form.add(cmbKertas);
-        form.add(new JLabel("Ukuran huruf struk"));    form.add(cmbUkuran);
-        form.add(new JLabel("Printer struk"));         form.add(cmbPrinter);
-        form.add(chkOtomatis);
+        form.add(new JLabel("Nama toko"));  form.add(txtInfoNama);
+        form.add(new JLabel("Alamat"));     form.add(txtInfoAlamat);
+        form.add(new JLabel("No. telepon")); form.add(txtInfoTelp);
 
-        JButton btnSimpan = Tema.tombol("Simpan Pengaturan", Tema.BIRU);
-        btnSimpan.addActionListener(e -> simpanToko());
+        JButton btnSimpan = Tema.tombol("Simpan Info Toko", Tema.BIRU);
+        btnSimpan.addActionListener(e -> simpanInfoToko());
 
         JLabel info = new JLabel(infoDatabase());
         info.setForeground(Tema.ABU);
 
         Tema.Kartu k = new Tema.Kartu();
         k.setLayout(new BorderLayout(0, 10));
-        k.add(new JLabel("<html><b>Info Toko &amp; Struk</b></html>"), BorderLayout.NORTH);
+        k.add(new JLabel("<html><b>Info Toko</b></html>"), BorderLayout.NORTH);
         JPanel tengah = new JPanel(new BorderLayout());
         tengah.setOpaque(false);
         tengah.add(form, BorderLayout.NORTH);
@@ -109,12 +113,122 @@ public class SettingPanel extends JPanel {
         return k;
     }
 
+    // =====================================================
+    //  TAB 2: STRUK (nama/alamat/pesan struk, pengaturan + pratinjau langsung)
+    // =====================================================
+    private final JTextArea areaStruk = new JTextArea();
+    private final JPanel kertasStruk = new JPanel(new BorderLayout());
+
+    JPanel buatTabStruk() {
+        JPanel form = new JPanel(new GridLayout(0, 1, 0, 4));
+        form.setOpaque(false);
+        form.add(new JLabel("Nama toko"));           form.add(txtToko);
+        form.add(new JLabel("Alamat"));              form.add(txtAlamat);
+        form.add(new JLabel("Pesan bawah struk"));   form.add(txtFooter);
+        form.add(new JLabel("Lebar kertas"));        form.add(cmbKertas);
+        form.add(new JLabel("Ukuran huruf struk"));  form.add(cmbUkuran);
+        form.add(new JLabel("Printer struk"));       form.add(cmbPrinter);
+        form.add(chkOtomatis);
+
+        JLabel petunjuk = new JLabel("<html>Pratinjau di kanan berubah langsung saat pengaturan diubah, "
+                + "tanpa mencetak.</html>");
+        petunjuk.setForeground(Tema.ABU);
+
+        JButton btnSimpan = Tema.tombol("Simpan Pengaturan", Tema.BIRU);
+        btnSimpan.addActionListener(e -> simpanToko());
+
+        Tema.Kartu kiri = new Tema.Kartu();
+        kiri.setLayout(new BorderLayout(0, 10));
+        kiri.setPreferredSize(new Dimension(380, 0));
+        kiri.add(new JLabel("<html><b>Pengaturan Struk</b></html>"), BorderLayout.NORTH);
+        JPanel tengah = new JPanel(new BorderLayout(0, 10));
+        tengah.setOpaque(false);
+        tengah.add(form, BorderLayout.NORTH);
+        tengah.add(petunjuk, BorderLayout.CENTER);
+        kiri.add(tengah, BorderLayout.CENTER);
+        kiri.add(btnSimpan, BorderLayout.SOUTH);
+
+        // ----- pratinjau: kertas putih di atas latar abu muda -----
+        areaStruk.setEditable(false);
+        areaStruk.setOpaque(false);
+        areaStruk.setForeground(Color.BLACK);
+        areaStruk.setMargin(new Insets(0, 0, 0, 0));
+        kertasStruk.setBackground(Color.WHITE);
+        kertasStruk.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Tema.GARIS),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)));
+        kertasStruk.add(areaStruk, BorderLayout.CENTER);
+
+        JPanel meja = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        meja.setBackground(new Color(0xF3EBDD));
+        meja.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        meja.add(kertasStruk);
+        JScrollPane scroll = new JScrollPane(meja);
+        scroll.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+        Tema.Kartu kanan = new Tema.Kartu();
+        kanan.setLayout(new BorderLayout(0, 10));
+        kanan.add(new JLabel("<html><b>Pratinjau Struk</b></html>"), BorderLayout.NORTH);
+        kanan.add(scroll, BorderLayout.CENTER);
+
+        // pratinjau ikut berubah saat nama/alamat/footer/kertas/ukuran diubah
+        javax.swing.event.DocumentListener dl = new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { perbaruiPratinjau(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { perbaruiPratinjau(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { perbaruiPratinjau(); }
+        };
+        txtToko.getDocument().addDocumentListener(dl);
+        txtAlamat.getDocument().addDocumentListener(dl);
+        txtFooter.getDocument().addDocumentListener(dl);
+        cmbKertas.addActionListener(e -> perbaruiPratinjau());
+        cmbUkuran.addActionListener(e -> perbaruiPratinjau());
+
+        JPanel p = new JPanel(new BorderLayout(14, 0));
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
+        p.add(kiri, BorderLayout.WEST);
+        p.add(kanan, BorderLayout.CENTER);
+        return p;
+    }
+
+    /** Menyusun ulang teks struk contoh dari isi form saat ini (belum perlu disimpan). */
+    void perbaruiPratinjau() {
+        int mm = cmbKertas.getSelectedIndex() == 1 ? 58 : 80;
+        int lebar = Pengaturan.lebar(mm, cmbUkuran.getSelectedIndex());
+        areaStruk.setText(Struk.contoh(txtToko.getText().trim(), txtAlamat.getText().trim(),
+                txtFooter.getText().trim(), lebar));
+
+        // lebar kertas di layar mengikuti 80 mm / 58 mm; huruf dikecilkan sampai 1 baris penuh muat
+        int kertasPx = mm == 58 ? 250 : 340;
+        int tersedia = kertasPx - 2 * 14 - 2;
+        int ukuran = 16;
+        Font f = new Font(Font.MONOSPACED, Font.PLAIN, ukuran);
+        while (ukuran > 6) {
+            f = new Font(Font.MONOSPACED, Font.PLAIN, ukuran);
+            if (areaStruk.getFontMetrics(f).charWidth('0') * lebar <= tersedia) break;
+            ukuran--;
+        }
+        areaStruk.setFont(f);
+        int tinggi = areaStruk.getPreferredSize().height + 2 * 14 + 2;
+        kertasStruk.setPreferredSize(new Dimension(kertasPx, tinggi));
+        kertasStruk.revalidate();
+        kertasStruk.repaint();
+    }
+
     String infoDatabase() {
         try (Connection c = Koneksi.get()) {
             return "Database terhubung: " + c.getCatalog();
         } catch (SQLException e) {
             return "Database TIDAK terhubung";
         }
+    }
+
+    void simpanInfoToko() {
+        Pengaturan.put("tokoNama", txtInfoNama.getText().trim());
+        Pengaturan.put("tokoAlamat", txtInfoAlamat.getText().trim());
+        Pengaturan.put("tokoTelp", txtInfoTelp.getText().trim());
+        JOptionPane.showMessageDialog(this, "Info toko tersimpan");
     }
 
     void simpanToko() {
@@ -258,7 +372,7 @@ public class SettingPanel extends JPanel {
         tblMenu.setModel(Db.kueri(
                 "SELECT m.id_menu, m.nama_menu, COALESCE(k.nama_kategori,'-'), CAST(m.harga AS UNSIGNED), "
               + "m.status, COALESCE(m.deskripsi,''), m.stok "
-              + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori ORDER BY m.id_menu",
+              + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori WHERE m.dihapus=0 ORDER BY m.id_menu",
                 new String[]{"ID", "Menu", "Kategori", "Harga", "Status", "Deskripsi", "Stok"}));
         kosongkanMenu();
     }
@@ -421,28 +535,39 @@ public class SettingPanel extends JPanel {
                 "Konfirmasi", JOptionPane.YES_NO_OPTION);
         if (ok != JOptionPane.YES_OPTION) return;
 
+        final int id = idMenu;
+        String info = null;
         try (Connection c = Koneksi.get()) {
             c.setAutoCommit(false);
             try {
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM menu_varian WHERE id_menu=?")) {
-                    ps.setInt(1, idMenu);
+                    ps.setInt(1, id);
                     ps.executeUpdate();
                 }
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM menu WHERE id_menu=?")) {
-                    ps.setInt(1, idMenu);
+                    ps.setInt(1, id);
                     ps.executeUpdate();
                 }
                 c.commit();
             } catch (SQLException e) {
                 c.rollback();
-                throw e;
+                // 1451 = masih dipakai tabel lain (menu sudah pernah terjual)
+                if (e.getErrorCode() != 1451 && !(e instanceof java.sql.SQLIntegrityConstraintViolationException)) throw e;
+                // Riwayat penjualan harus tetap utuh, jadi menu disembunyikan dari semua daftar.
+                try (PreparedStatement ps = c.prepareStatement("UPDATE menu SET dihapus=1 WHERE id_menu=?")) {
+                    ps.setInt(1, id);
+                    ps.executeUpdate();
+                }
+                c.commit();
+                info = "Menu ini sudah pernah terjual, jadi dihapus dari daftar menu.\n"
+                     + "Riwayat transaksi dan laporan penjualan tetap tersimpan.";
             }
-            muatMenu();
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Menu tidak bisa dihapus karena sudah pernah terjual.\n"
-                  + "Ubah statusnya menjadi \"habis\" saja.");
+            Db.error(e);
+            return;
         }
+        muatMenu();
+        if (info != null) JOptionPane.showMessageDialog(this, info);
     }
 
     // ----- gambar menu -----
@@ -528,7 +653,112 @@ public class SettingPanel extends JPanel {
         return k;
     }
 
+    // =====================================================
+    //  TAB 4: LOGO APLIKASI
+    // =====================================================
+    Tema.Kartu buatKartuLogo() {
+        lblLogo.setOpaque(true);
+        lblLogo.setBackground(Color.WHITE);
+        lblLogo.setForeground(Tema.ABU);
+        lblLogo.setBorder(BorderFactory.createLineBorder(Tema.GARIS));
+        lblLogo.setPreferredSize(new Dimension(0, 210));
+
+        JLabel petunjuk = new JLabel("<html>Logo tampil di halaman login dan jadi ikon aplikasi. "
+                + "Pakai gambar landscape (lebar) supaya hasilnya paling bagus. "
+                + "Perubahan terlihat di halaman login berikutnya (setelah logout).</html>");
+        petunjuk.setForeground(Tema.ABU);
+
+        JButton btnPilih = new JButton("Pilih Gambar...");
+        btnPilih.setFocusPainted(false);
+        btnPilih.addActionListener(e -> pilihLogo());
+        JButton btnSimpan = Tema.tombol("Simpan Logo", Tema.KUNING);
+        btnSimpan.addActionListener(e -> simpanLogo());
+        JButton btnBawaan = new JButton("Kembalikan Bawaan");
+        btnBawaan.setFocusPainted(false);
+        btnBawaan.addActionListener(e -> kembalikanLogoBawaan());
+
+        JPanel tombol = new JPanel(new GridLayout(1, 3, 8, 0));
+        tombol.setOpaque(false);
+        tombol.add(btnPilih);
+        tombol.add(btnSimpan);
+        tombol.add(btnBawaan);
+
+        JPanel bawah = new JPanel(new BorderLayout(0, 10));
+        bawah.setOpaque(false);
+        bawah.add(petunjuk, BorderLayout.NORTH);
+        bawah.add(tombol, BorderLayout.SOUTH);
+
+        Tema.Kartu k = new Tema.Kartu();
+        k.setLayout(new BorderLayout(0, 12));
+        k.add(new JLabel("<html><b>Logo Aplikasi</b></html>"), BorderLayout.NORTH);
+        JPanel tengah = new JPanel(new BorderLayout(0, 12));
+        tengah.setOpaque(false);
+        tengah.add(lblLogo, BorderLayout.NORTH);
+        tengah.add(bawah, BorderLayout.CENTER);
+        k.add(tengah, BorderLayout.CENTER);
+        return k;
+    }
+
+    private void pilihLogo() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Pilih logo aplikasi");
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Gambar (JPG, PNG, GIF, WebP)", "jpg", "jpeg", "png", "gif", "webp"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        try {
+            BufferedImage image = ImageIO.read(chooser.getSelectedFile());
+            if (image == null) throw new IOException("File bukan gambar yang didukung.");
+            logoBaru = LogoToko.keBytes(image);
+            tampilkanLogo(ImageIO.read(new ByteArrayInputStream(logoBaru)));
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal membaca gambar: " + ex.getMessage());
+        }
+    }
+
+    private void simpanLogo() {
+        if (logoBaru == null) {
+            JOptionPane.showMessageDialog(this, "Pilih gambar dulu dengan tombol \"Pilih Gambar...\".");
+            return;
+        }
+        try {
+            LogoToko.simpan(logoBaru);
+            logoBaru = null;
+            JOptionPane.showMessageDialog(this, "Logo tersimpan. Akan tampil di halaman login berikutnya.");
+        } catch (SQLException ex) {
+            Db.error(ex);
+        }
+    }
+
+    private void kembalikanLogoBawaan() {
+        int ok = JOptionPane.showConfirmDialog(this, "Kembalikan logo ke bawaan?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+        try {
+            LogoToko.hapus();
+            logoBaru = null;
+            tampilkanLogo(LogoToko.muat());
+        } catch (SQLException ex) {
+            Db.error(ex);
+        }
+    }
+
+    /** Menampilkan pratinjau logo di dalam kotak, proporsi tetap. */
+    private void tampilkanLogo(BufferedImage image) {
+        if (image == null) {
+            lblLogo.setIcon(null);
+            lblLogo.setText("Logo tidak tersedia");
+            return;
+        }
+        double s = Math.min(440.0 / image.getWidth(), 190.0 / image.getHeight());
+        int w = Math.max(1, (int) Math.round(image.getWidth() * s));
+        int h = Math.max(1, (int) Math.round(image.getHeight() * s));
+        lblLogo.setText("");
+        lblLogo.setIcon(new ImageIcon(LogoToko.skala(image, w, h)));
+    }
+
     public void segarkan() {
+        txtInfoNama.setText(Pengaturan.get("tokoNama", Pengaturan.get("namaToko", "Tahu Walik")));
+        txtInfoAlamat.setText(Pengaturan.get("tokoAlamat", Pengaturan.get("alamat", "")));
+        txtInfoTelp.setText(Pengaturan.get("tokoTelp", ""));
         txtToko.setText(Pengaturan.get("namaToko", "Tahu Walik"));
         txtAlamat.setText(Pengaturan.get("alamat", ""));
         txtFooter.setText(Pengaturan.get("footer", "Terima kasih!"));
@@ -540,8 +770,11 @@ public class SettingPanel extends JPanel {
         cmbPrinter.setSelectedItem(Pengaturan.get("printer", ""));
         if (cmbPrinter.getSelectedIndex() < 0) cmbPrinter.setSelectedIndex(0);
         chkOtomatis.setSelected("1".equals(Pengaturan.get("otomatis", "0")));
+        perbaruiPratinjau();
         muatRasa();
         muatMenu();
+        logoBaru = null;
+        tampilkanLogo(LogoToko.muat());
     }
 
     void muatRasa() {

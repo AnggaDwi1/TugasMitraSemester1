@@ -35,20 +35,20 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
+import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
-import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -68,29 +68,47 @@ public class TransaksiPanel extends JPanel {
     /** Kotak "foto" menu: kotak kuning muda dengan huruf depan nama menu. */
     static class Foto extends JPanel {
         final String huruf;
-        final Image gambar;
+        final BufferedImage gambar;
         Foto(String nama, byte[] bytes) {
             setOpaque(false);
             setPreferredSize(new Dimension(0, 84));
             huruf = nama.isEmpty() ? "?" : nama.substring(0, 1).toUpperCase();
-            Image loaded = null;
+            BufferedImage loaded = null;
             if (bytes != null) try {
                 BufferedImage original = ImageIO.read(new ByteArrayInputStream(bytes));
-                if (original != null) loaded = original.getScaledInstance(240, 120, Image.SCALE_SMOOTH);
+                if (original != null) loaded = kecilkan(original, 480);
             } catch (IOException ignored) { }
             gambar = loaded;
         }
+        /** Kecilkan gambar (rasio tetap) supaya hemat memori. */
+        static BufferedImage kecilkan(BufferedImage src, int lebarMaks) {
+            if (src.getWidth() <= lebarMaks) return src;
+            int h = Math.max(1, Math.round(src.getHeight() * (float) lebarMaks / src.getWidth()));
+            BufferedImage out = new BufferedImage(lebarMaks, h, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(src.getScaledInstance(lebarMaks, h, Image.SCALE_SMOOTH), 0, 0, null);
+            g.dispose();
+            return out;
+        }
+
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g2.setColor(Tema.KUNING_MUDA);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
             if (gambar != null) {
                 Shape oldClip = g2.getClip();
                 g2.clip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 14, 14));
-                g2.drawImage(gambar, 0, 0, getWidth(), getHeight(), this);
+                // "cover": gambar memenuhi kotak, rasio asli dijaga, kelebihan dipotong di tengah
+                double s = Math.max((double) getWidth() / gambar.getWidth(), (double) getHeight() / gambar.getHeight());
+                int dw = (int) Math.ceil(gambar.getWidth() * s);
+                int dh = (int) Math.ceil(gambar.getHeight() * s);
+                g2.drawImage(gambar, (getWidth() - dw) / 2, (getHeight() - dh) / 2, dw, dh, null);
                 g2.setClip(oldClip);
             } else {
                 g2.setColor(Tema.COKELAT);
@@ -348,7 +366,7 @@ public class TransaksiPanel extends JPanel {
     // ---------- kartu menu ----------
     void muatMenu() {
         gridMenu.removeAll();
-        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar, stok FROM menu WHERE status='tersedia'");
+        StringBuilder sql = new StringBuilder("SELECT id_menu, nama_menu, harga, gambar, stok FROM menu WHERE status='tersedia' AND dihapus=0");
         if (idKategoriAktif > 0) sql.append(" AND id_kategori=?");
         String cari = txtCari.getText().trim().toLowerCase();
         if (!cari.isEmpty()) sql.append(" AND LOWER(nama_menu) LIKE ?");
@@ -413,54 +431,188 @@ public class TransaksiPanel extends JPanel {
         return k;
     }
 
-    /** Dialog kecil untuk pilih rasa, jumlah, dan catatan. */
+    /** Dialog tambah pesanan: pilih rasa (chip), jumlah (stepper), dan catatan. */
     void dialogTambah(int idMenu, String nama, double harga, int stok) {
-        // Hitung berapa qty menu ini yang sudah ada di keranjang
+        // hitung qty menu ini yang sudah ada di keranjang
         int sudahDiKeranjang = 0;
         for (Item it : keranjang) {
             if (it.idMenu == idMenu) sudahDiKeranjang += it.qty;
         }
-        int sisaStok = stok - sudahDiKeranjang;
+        final int sisaStok = stok - sudahDiKeranjang;
         if (sisaStok <= 0) {
             JOptionPane.showMessageDialog(this, "Stok " + nama + " sudah habis di keranjang.");
             return;
         }
 
-        JComboBox<Rasa> cmbRasa = new JComboBox<>();
-        cmbRasa.addItem(new Rasa(0, "Tanpa rasa"));
+        // ambil daftar rasa dari database
+        List<Rasa> daftarRasa = new ArrayList<>();
         try (Connection c = Koneksi.get();
              PreparedStatement ps = c.prepareStatement(
                      "SELECT r.id_rasa, r.nama_rasa FROM menu_varian mv "
                    + "JOIN varian_rasa r ON r.id_rasa=mv.id_rasa WHERE mv.id_menu=? ORDER BY r.id_rasa")) {
             ps.setInt(1, idMenu);
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) cmbRasa.addItem(new Rasa(rs.getInt(1), rs.getString(2)));
+                while (rs.next()) daftarRasa.add(new Rasa(rs.getInt(1), rs.getString(2)));
             }
         } catch (SQLException e) {
             Db.error(e);
             return;
         }
-        if (cmbRasa.getItemCount() > 1) cmbRasa.setSelectedIndex(1);
 
-        JSpinner spn = new JSpinner(new SpinnerNumberModel(1, 1, sisaStok, 1));
-        JTextField txtCatatan = new JTextField(15);
-        JPanel form = new JPanel(new GridLayout(0, 2, 6, 6));
-        form.add(new JLabel("Rasa:"));    form.add(cmbRasa);
-        form.add(new JLabel("Jumlah:"));  form.add(spn);
-        form.add(new JLabel("Catatan:")); form.add(txtCatatan);
+        final Rasa[] pilihRasa = { daftarRasa.isEmpty() ? new Rasa(0, "Tanpa rasa") : daftarRasa.get(0) };
+        final int[] qty = { 1 };
+        final boolean[] ok = { false };
 
-        int ok = JOptionPane.showConfirmDialog(this, form, nama + " - " + Tema.rp(harga),
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (ok != JOptionPane.OK_OPTION) return;
+        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this), "Tambah Pesanan",
+                java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        d.setResizable(false);
 
-        Rasa rasa = (Rasa) cmbRasa.getSelectedItem();
-        int qty = (Integer) spn.getValue();
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(Tema.BG);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        // ----- header: nama, harga, stok -----
+        JLabel lblNama = new JLabel("<html><body style='width:280px'>" + Tema.esc(nama) + "</body></html>");
+        lblNama.setFont(new Font("SansSerif", Font.BOLD, 20));
+        lblNama.setForeground(Tema.COKELAT);
+        JLabel lblHarga = new JLabel(Tema.rp(harga));
+        lblHarga.setFont(new Font("SansSerif", Font.BOLD, 15));
+        lblHarga.setForeground(Tema.COKELAT);
+        JLabel lblSisa = new JLabel("Tersedia " + sisaStok + " porsi");
+        lblSisa.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        lblSisa.setForeground(Tema.ABU);
+
+        JPanel head = new JPanel(new BorderLayout(0, 2));
+        head.setOpaque(false);
+        JPanel headBawah = new JPanel(new GridLayout(2, 1, 0, 2));
+        headBawah.setOpaque(false);
+        headBawah.add(lblHarga);
+        headBawah.add(lblSisa);
+        head.add(lblNama, BorderLayout.NORTH);
+        head.add(headBawah, BorderLayout.CENTER);
+
+        JPanel isi = new JPanel();
+        isi.setLayout(new BoxLayout(isi, BoxLayout.Y_AXIS));
+        isi.setOpaque(false);
+        tambahV(isi, head, 14);
+
+        // ----- rasa (chip, grid 2 kolom supaya tidak melebar) -----
+        if (!daftarRasa.isEmpty()) {
+            JPanel chips = new JPanel(new GridLayout(0, 2, 8, 8));
+            chips.setOpaque(false);
+            ButtonGroup grup = new ButtonGroup();
+            boolean pertama = true;
+            for (Rasa r : daftarRasa) {
+                JToggleButton t = new JToggleButton(r.nama, pertama);
+                pertama = false;
+                t.putClientProperty("JButton.buttonType", "roundRect");
+                t.putClientProperty("JButton.selectedBackground", Tema.KUNING);
+                t.putClientProperty("JButton.selectedForeground", Tema.COKELAT);
+                t.setBackground(Color.WHITE);
+                t.setForeground(Tema.COKELAT);
+                t.setFont(new Font("SansSerif", Font.BOLD, 13));
+                t.setFocusPainted(false);
+                t.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                t.setMargin(new Insets(8, 12, 8, 12));
+                t.addActionListener(e -> pilihRasa[0] = r);
+                grup.add(t);
+                chips.add(t);
+            }
+            tambahV(isi, seksi("Pilih Rasa"), 6);
+            tambahV(isi, chips, 16);
+        }
+
+        // ----- jumlah (stepper) -----
+        JLabel lblQty = new JLabel("1", SwingConstants.CENTER);
+        lblQty.setFont(new Font("SansSerif", Font.BOLD, 20));
+        lblQty.setForeground(Tema.COKELAT);
+        lblQty.setPreferredSize(new Dimension(48, 38));
+
+        JLabel lblSubtotal = new JLabel(Tema.rp(harga), SwingConstants.RIGHT);
+        lblSubtotal.setFont(new Font("SansSerif", Font.BOLD, 18));
+        lblSubtotal.setForeground(Tema.COKELAT);
+
+        Runnable updateQty = () -> {
+            lblQty.setText(String.valueOf(qty[0]));
+            lblSubtotal.setText(Tema.rp(harga * qty[0]));
+        };
+
+        JButton btnMin = tombolQty("−");
+        JButton btnPlus = tombolQty("+");
+        btnMin.setPreferredSize(new Dimension(38, 38));
+        btnPlus.setPreferredSize(new Dimension(38, 38));
+        btnMin.addActionListener(e -> { if (qty[0] > 1) { qty[0]--; updateQty.run(); } });
+        btnPlus.addActionListener(e -> { if (qty[0] < sisaStok) { qty[0]++; updateQty.run(); } });
+
+        JPanel stepper = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        stepper.setOpaque(false);
+        stepper.add(btnMin);
+        stepper.add(lblQty);
+        stepper.add(btnPlus);
+
+        JPanel barisQty = new JPanel(new BorderLayout());
+        barisQty.setOpaque(false);
+        barisQty.add(stepper, BorderLayout.WEST);
+        barisQty.add(lblSubtotal, BorderLayout.EAST);
+
+        tambahV(isi, seksi("Jumlah"), 6);
+        tambahV(isi, barisQty, 16);
+
+        // ----- catatan -----
+        JTextField txtCatatan = new JTextField();
+        txtCatatan.putClientProperty("JTextField.placeholderText", "Contoh: tidak pedas");
+        txtCatatan.setPreferredSize(new Dimension(0, 40));
+        txtCatatan.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        txtCatatan.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        tambahV(isi, seksi("Catatan (opsional)"), 6);
+        tambahV(isi, txtCatatan, 0);
+
+        // ----- tombol -----
+        JButton btnBatal = new JButton("Batal");
+        btnBatal.setPreferredSize(new Dimension(90, 44));
+        btnBatal.setFocusPainted(false);
+        btnBatal.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnBatal.addActionListener(e -> d.dispose());
+
+        JButton btnOk = Tema.tombol("Tambah ke Pesanan", Tema.KUNING);
+        btnOk.setFont(new Font("SansSerif", Font.BOLD, 15));
+        btnOk.setPreferredSize(new Dimension(0, 44));
+        btnOk.addActionListener(e -> { ok[0] = true; d.dispose(); });
+
+        JPanel tombol = new JPanel(new BorderLayout(10, 0));
+        tombol.setOpaque(false);
+        tombol.add(btnBatal, BorderLayout.WEST);
+        tombol.add(btnOk, BorderLayout.CENTER);
+
+        JPanel bawah = new JPanel(new BorderLayout());
+        bawah.setOpaque(false);
+        bawah.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.GARIS),
+                BorderFactory.createEmptyBorder(14, 0, 0, 0)));
+        bawah.add(tombol, BorderLayout.CENTER);
+
+        root.add(isi, BorderLayout.CENTER);
+        root.add(bawah, BorderLayout.SOUTH);
+
+        d.setContentPane(root);
+        d.getRootPane().setDefaultButton(btnOk);
+        d.getRootPane().registerKeyboardAction(e -> d.dispose(),
+                KeyStroke.getKeyStroke("ESCAPE"), JComponent.WHEN_IN_FOCUSED_WINDOW);
+        d.pack();
+        d.setSize(380, d.getHeight()); // lebar dikunci supaya ramping
+        d.setLocationRelativeTo(this);
+        d.setVisible(true); // menunggu sampai dialog ditutup
+
+        if (!ok[0]) return;
+
+        Rasa rasa = pilihRasa[0];
+        int jumlah = qty[0];
         String cat = txtCatatan.getText().trim();
 
         // item yang sama (menu + rasa + catatan) digabung jumlahnya
         for (Item it : keranjang) {
             if (it.idMenu == idMenu && it.idRasa == rasa.id && it.catatan.equals(cat)) {
-                it.qty += qty;
+                it.qty += jumlah;
                 refreshKeranjang();
                 return;
             }
@@ -471,10 +623,18 @@ public class TransaksiPanel extends JPanel {
         it.idRasa = rasa.id;
         it.rasa = rasa.id == 0 ? "-" : rasa.nama;
         it.harga = harga;
-        it.qty = qty;
+        it.qty = jumlah;
         it.catatan = cat;
         keranjang.add(it);
         refreshKeranjang();
+    }
+
+    /** Label judul kecil untuk tiap bagian dialog. */
+    JLabel seksi(String teks) {
+        JLabel l = new JLabel(teks);
+        l.setFont(new Font("SansSerif", Font.BOLD, 13));
+        l.setForeground(Tema.ABU);
+        return l;
     }
 
     // ---------- keranjang ----------

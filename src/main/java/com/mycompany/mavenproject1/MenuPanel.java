@@ -130,6 +130,7 @@ public class MenuPanel extends JPanel {
                 String sql = "SELECT m.id_menu, m.nama_menu, COALESCE(k.nama_kategori,'Lainnya'), m.harga, "
                         + "m.status, COALESCE(m.deskripsi,''), m.stok, m.gambar "
                         + "FROM menu m LEFT JOIN kategori_menu k ON k.id_kategori=m.id_kategori "
+                        + "WHERE m.dihapus=0 "
                         + "ORDER BY k.nama_kategori, m.nama_menu";
                 try (Connection c = Koneksi.get();
                      Statement s = c.createStatement();
